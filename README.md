@@ -2,6 +2,23 @@
 
 Belediye personeli ve yöneticileri için web tabanlı ön fizibilite hesaplayıcısı. Belediye mevcut durumunu ve düşündüğü yatırımın maliyetlerini girer; araç yatırımın ne kadar tasarruf sağlayacağını, kaç yılda kendini amorti edeceğini, ekonomik açıdan anlamlı olup olmadığını ve bu sonucun belirsizliğe ne kadar dayanıklı olduğunu hesaplar.
 
+## Tasarımlar
+
+Aynı hesap motorunu kullanan iki arayüz tasarımı ayrı dallarda tutulur:
+
+| Dal | Tasarım |
+|---|---|
+| [`ccr-32c2df3d-ftrlux`](../../tree/ccr-32c2df3d-ftrlux) | **v1 – Klasik:** sade, rapor odaklı, açık/koyu tema (bu dal) |
+| [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi:** koyu, gösterge paneli tarzı, etkileşimli |
+
+**v1 – Klasik**
+
+| Masaüstü | Mobil |
+|---|---|
+| ![v1 aydınlatma](docs/ekran-goruntuleri/v1-masaustu-aydinlatma.png) | <img src="docs/ekran-goruntuleri/v1-mobil-su.png" width="260" alt="v1 mobil"> |
+| ![v1 trafik, koyu tema](docs/ekran-goruntuleri/v1-masaustu-trafik.png) | |
+| ![v1 karşılaştırma](docs/ekran-goruntuleri/v1-masaustu-karsilastirma.png) | |
+
 ## Kapsanan yatırımlar
 
 | Yatırım | Belediyeden istenen temel veri | Hesaplanan fayda |
