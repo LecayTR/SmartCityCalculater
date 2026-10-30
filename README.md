@@ -30,6 +30,26 @@ Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kulla
 - **Karşılaştırma:** "Hangi yatırım önce yapılmalı?" sorusuna sade cümlelerle sıralı bir cevap verir.
 - **Mobil:** kısa cevap kartı ekrandan çıkınca altta küçük bir özet çubuğu belirir.
 
+### Belgeden doldurma (v3)
+
+Veriler hibrit biçimde girilir: her alan elle doldurulabilir ya da **Belge yükle** sayfasından belediyenin elindeki dosyalar yüklenebilir. Araç belge türünü tanır, değerleri hesaplar ve uygulamadan önce bir kontrol tablosunda gösterir. Uygulanan her değerin altında hangi dosyadan, hangi hücreden veya hangi hesapla geldiği yazar; bu bilgi rapora da girer. Dosyalar tarayıcıda okunur, hiçbir sunucuya gönderilmez.
+
+| Belge | Doldurduğu alanlar | Tanınan yazım biçimleri |
+|---|---|---|
+| Elektrik e-Faturaları (UBL-TR XML) | Aydınlatma birim fiyatı | Çoklu dosya; enerji ve dağıtım satırlarındaki kWh çift sayılmaz; iade ve tekrar eden faturalar ayıklanır; vergiler dahil/hariç tutar seçimi |
+| Elektrik fatura listesi | Aydınlatma birim fiyatı | kWh sütunlu ya da yalnız tutarlı liste; birden çok tutar sütunu arasında seçim; “Toplam” satırları ayıklanır |
+| Su kayıpları yıllık raporu (su dengesi tablosu) | Sisteme giren su, kayıp oranı, fiziki kayıp payı, abone sayısı | Dikey tablo veya yatay çok yıllık tablo (yıl seçimi); m³ veya bin m³ |
+| Armatür envanteri | Armatür sayısı, ortalama güç | Satır başına bir armatür ya da adet sütunu; güç ayrı sütunda veya tip adında (“150W SON”); W/kW; sökülmüş/pasif kayıtları ayıklama; isteğe bağlı balast kaybı |
+| Taşıt Tanıma / araç takip dökümü | Araç sayısı, yıllık km, yakıt tüketimi, motorin fiyatı | Km sayacı veya mesafe sütunu; araç türü/müdürlük süzme; bir yıldan kısa dönemi yıllığa çevirme |
+| Hesaplayıcı veri şablonu (.xlsx) | Tüm alanlar | Sayfadan indirilen şablon; birimlere gönderilip doldurulur |
+| Diğer tablolar | Seçilen herhangi bir alan | Sütun ve işlemi (toplam, ortalama, satır sayısı…) kullanıcı seçer; trafik sayımları gibi standart olmayan dökümler için |
+
+Dosya biçimleri: `.xlsx`, `.ods` (LibreOffice/Pardus), web sistemlerinin “Excel’e aktar” çıktısı olan HTML tabanlı `.xls`, Excel 2003 XML, `.csv` (`;` veya `,` ayraçlı, UTF-8 ya da Windows-1254 kodlamalı) ve e-Fatura `.xml`. Eski ikili `.xls` dosyaları ve PDF’ler güvenilir biçimde okunamadığı için kullanıcıdan `.xlsx`/CSV istenir.
+
+| Belge yükleme | Kontrol tablosu |
+|---|---|
+| ![v3 belge yükleme](docs/ekran-goruntuleri/v3-belge-yukleme.png) | ![v3 kontrol](docs/ekran-goruntuleri/v3-belge-kontrol.png) |
+
 ### Yan yana
 
 | v1 – Klasik | v2 – Kontrol Merkezi | v3 – Sakin |
@@ -80,6 +100,10 @@ assets/js/sources.js   Kaynakça
 assets/js/charts.js    Bağımlılıksız SVG grafikler
 assets/js/app.js       Arayüz
 assets/js/hints.js     "Bu veri nereden bulunur?" ipuçları (v3)
+assets/js/sheets.js    Belge okuyucu: xlsx, ods, csv, HTML/2003 XML tabanlı xls, e-Fatura XML (v3)
+assets/js/xml.js       Bağımlılıksız XML ayrıştırıcı (v3)
+assets/js/importer.js  Belge türlerini tanıma ve değer çıkarma (v3)
+assets/js/template.js  İndirilebilir .xlsx veri şablonu (v3)
 tests/                 Hesap motoru testleri (node --test)
 ```
 

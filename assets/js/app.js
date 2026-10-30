@@ -6,6 +6,9 @@ import { evaluate, monteCarlo, tornado, breakEven, uncertainParams } from './eng
 import { lineChart, hbarChart, histogram, installTooltips } from './charts.js';
 import { SOURCES } from './sources.js';
 import { HINTS, COST_HINT } from './hints.js';
+import { readFile, ReadError } from './sheets.js';
+import { EXTRACTORS, MANUAL, TARGETS, OPERATIONS, detectType, extractorById, check, inputOf, guessHeader, columnsOf, applyOperation } from './importer.js';
+import { buildTemplate } from './template.js';
 import * as F from './format.js';
 
 const STORAGE_KEY = 'akilli-sehir-analizi-v1';
@@ -28,6 +31,8 @@ const P = {
   wallet: 'M3 7a3 3 0 0 1 3-3h12v3H6a1 1 0 0 0 0 2h15v11H6a3 3 0 0 1-3-3zm14 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z',
   shield: 'M12 2 4 5v6c0 5 3.4 9.6 8 11 4.6-1.4 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z',
   sliders: 'M3 17v2h6v-2zm0-12v2h10V5zm10 16v-2h8v-2h-8v-2h-2v6zM7 9v2H3v2h4v2h2V9zm14 4v-2H11v2zm-6-4h2V7h4V5h-4V3h-2z',
+  upload: 'M12 3 6.5 8.5l1.4 1.4L11 6.8V16h2V6.8l3.1 3.1 1.4-1.4zM4 18v3h16v-3h-2v1H6v-1z',
+  doc: 'M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5zM8 12v2h8v-2zm0 4v2h5v-2z',
   leaf: 'M20 3C10 3 4 8 4 15c0 1.6.4 3 1 4.2L3.3 21l1.4 1.4 2-2C7.9 21.3 9.4 22 11 22c7 0 11-7 9-19zM8.5 17.5C10 14 13 11 16 9.5 13.5 12 11.5 14.5 10 18z',
   pin: 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z',
   bulb: 'M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2zm-3 18h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z',
@@ -40,6 +45,8 @@ const STATUS_ICON = {
 };
 const STATUS_COLOR = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)' };
 const NAV_SHORT = { aydinlatma: 'Aydınlatma', su: 'Su', atik: 'Atık', trafik: 'Trafik' };
+// Her yatırım sayfasında önerilen belge türleri
+const DOCS_FOR = { aydinlatma: ['efatura', 'fatura-tablosu', 'armatur', 'sablon'], su: ['su-dengesi', 'sablon'], atik: ['yakit', 'sablon'], trafik: ['sablon', 'elle'] };
 
 // ---------- Durum ----------
 
@@ -53,6 +60,8 @@ function freshState() {
     basis: Object.fromEntries(MODELS.map(m => [m.id, m.primary])),
     // Kullanıcının kendi verisiyle doldurduğu veya "doğru" diye onayladığı alanlar
     confirmed: Object.fromEntries(MODELS.map(m => [m.id, []])),
+    // Belgeden gelen değerlerin kaynağı: { yatırım: { alan: { file, where, at } } }; "genel" genel ayarlar içindir
+    sources: Object.fromEntries(TARGETS.map(t => [t.id, {}])),
   };
 }
 
@@ -71,6 +80,13 @@ function merge(base, saved) {
     if (saved.basis?.[m.id] === 'fin' || saved.basis?.[m.id] === 'eco') base.basis[m.id] = saved.basis[m.id];
     const keys = new Set(m.inputs.map(i => i.key));
     if (Array.isArray(saved.confirmed?.[m.id])) base.confirmed[m.id] = saved.confirmed[m.id].filter(k => keys.has(k));
+  }
+  for (const t of TARGETS) {
+    for (const [k, src] of Object.entries(saved.sources?.[t.id] || {})) {
+      if (t.inputs.some(i => i.key === k) && src && typeof src.file === 'string') {
+        base.sources[t.id][k] = { file: src.file.slice(0, 300), where: String(src.where || '').slice(0, 300), at: String(src.at || '').slice(0, 30) };
+      }
+    }
   }
   return base;
 }
@@ -225,7 +241,7 @@ function renderNav() {
     return link(m.id, NAV_SHORT[m.id], m.icon, ` <span class="dot" style="background:${STATUS_COLOR[vd.level]}" title="${esc(vd.label)}"></span>`);
   }).join('');
   $('#main-nav').innerHTML = link('baslangic', 'Başlangıç', P.home) + '<span class="nav-sep" aria-hidden="true"></span>' + models +
-    '<span class="nav-sep" aria-hidden="true"></span>' + link('karsilastirma', 'Karşılaştır', P.compare) + link('yontem', 'Yöntem', P.method);
+    '<span class="nav-sep" aria-hidden="true"></span>' + link('belgeler', 'Belge yükle', P.upload) + link('karsilastirma', 'Karşılaştır', P.compare) + link('yontem', 'Yöntem', P.method);
   $('[data-bind="municipality"]').textContent = state.municipality || 'Yatırım Rehberi';
   // Dar ekranda etkin sekme görünür alana kaydırılır.
   const nav = $('#main-nav'), active = nav.querySelector('[aria-current="page"]');
@@ -235,13 +251,14 @@ function renderNav() {
 function route() {
   const [page, anchor] = decodeURIComponent(location.hash.slice(1)).split('/');
   const id = page || 'baslangic';
-  const target = modelById(id) || ['baslangic', 'karsilastirma', 'yontem'].includes(id) ? id : 'baslangic';
+  const target = modelById(id) || ['baslangic', 'belgeler', 'karsilastirma', 'yontem'].includes(id) ? id : 'baslangic';
   const changed = target !== currentPage;
   currentPage = target;
   answerObserver?.disconnect();
   $('#answer-dock').hidden = true;
   if (modelById(target)) renderModelPage(modelById(target));
   else if (target === 'karsilastirma') renderCompare();
+  else if (target === 'belgeler') renderImport();
   else if (target === 'yontem') renderMethod(anchor);
   else renderStart();
   renderNav();
@@ -279,7 +296,7 @@ function renderStart() {
       </div>
       <ol class="how">
         <li><div><b>Yatırımı seçin</b><span>Aşağıdaki dört akıllı şehir yatırımından birini açın.</span></div></li>
-        <li><div><b>Kendi verilerinizi girin</b><span>“Örnek” etiketli alanları kayıtlarınızla değiştirin. Her alanda verinin nereden bulunacağı yazar.</span></div></li>
+        <li><div><b>Verilerinizi girin ya da belge yükleyin</b><span>“Örnek” etiketli alanları elle değiştirin veya e-Fatura, su kayıpları raporu, envanter gibi belgelerinizi yükleyin.</span></div></li>
         <li><div><b>Cevabı okuyun, rapor alın</b><span>Sonuç, yöneticilerin sorduğu sorulara göre özetlenir. “Rapor al” ile PDF olarak saklayabilirsiniz.</span></div></li>
       </ol>
     </section>
@@ -287,6 +304,7 @@ function renderStart() {
     <p class="section-sub">Kartlardaki sonuçlar şu an girili değerlere göredir; örnek değerlerle başlar.</p>
     <div class="choice-grid">${cards}</div>
     <div class="quick">
+      <a class="card" href="#belgeler">${svg(P.upload)}<div><b>Belgeden doldurun</b><span>Excel, CSV veya e-Fatura dosyalarınızdaki değerleri alanlara aktarın.</span></div></a>
       <a class="card" href="#karsilastirma">${svg(P.compare)}<div><b>Yatırımları karşılaştırın</b><span>Bütçe kısıtlıysa hangi yatırımın önce yapılacağını görün.</span></div></a>
       <a class="card" href="#" data-action="settings">${svg(P.settings)}<div><b>Genel ayarlar</b><span>Belediye adı, iskonto oranı, fiyat artışı ve karbon değeri.</span></div></a>
       <a class="card" href="#yontem">${svg(P.method)}<div><b>Yöntem ve kaynaklar</b><span>Hesaplamaların nasıl yapıldığı ve dayandığı kaynaklar.</span></div></a>
@@ -314,6 +332,7 @@ function fieldHtml(i, value, prefix, model) {
   const control = i.pct
     ? `<div class="slider-row"><input type="range" min="${i.min ?? 0}" max="${i.max ?? 100}" step="${i.step ?? 1}" value="${value}" data-key="${i.key}" style="${rangeVars(i, value)}" aria-label="${esc(i.label)}">${box}</div>`
     : box;
+  const src = state.sources[model ? model.id : 'genel']?.[i.key];
   return `<div class="field${example ? ' is-example' : ''}" data-key="${i.key}">
     <div class="field-top">
       <label for="${id}">${esc(i.label)}</label>
@@ -323,11 +342,22 @@ function fieldHtml(i, value, prefix, model) {
       </span>
     </div>
     ${control}
+    ${src ? sourceNote(src) : ''}
     ${where ? `<p class="where">${svg(P.pin)}<span>${esc(where)}</span></p>` : ''}
     ${i.help ? `<div class="help" id="${id}-help" hidden>${esc(i.help)}</div>` : ''}
     ${meta ? `<div class="meta">${meta}</div>` : ''}
     <div class="error" hidden></div>
   </div>`;
+}
+
+function sourceNote(src) {
+  return `<p class="source-note">${svg(P.doc)}<span>Belgeden: <b>${esc(src.file)}</b> · ${esc(src.where)}</span></p>`;
+}
+
+// Alan elle değiştirildiğinde belge kaynağı artık geçerli değildir.
+function dropSource(target, key, field) {
+  if (state.sources[target]?.[key]) { delete state.sources[target][key]; save(); }
+  field?.querySelector('.source-note')?.remove();
 }
 
 function validate(i, x) {
@@ -404,6 +434,11 @@ function renderModelPage(model) {
           <div class="meter"><div class="meter-bar"><i id="meter-fill"></i></div><div class="meter-text"><span>Belediye verisi</span><span id="meter-label"></span></div></div>
           <p class="hint">“Örnek” etiketli alanlar henüz varsayılan değerde. Kendi kaydınızla değiştirin ya da değer doğruysa “Doğru”ya basın.</p>
         </section>
+        <section class="card import-hint no-print">
+          <div class="import-hint-head">${svg(P.upload)}<div><b>Elle girmek zorunda değilsiniz</b><span>Belgelerinizi yükleyin; ilgili alanlar kontrolünüzden sonra dolsun.</span></div></div>
+          <ul>${(DOCS_FOR[model.id] || []).map(id => `<li>${esc((extractorById(id) || MANUAL).title)}</li>`).join('')}</ul>
+          <a class="btn" href="#belgeler">${svg(P.upload)}Belge yükle</a>
+        </section>
         ${groups}
         <div class="reset-row no-print"><button type="button" class="btn quiet" id="btn-reset-model">Bu yatırımın verilerini sıfırla</button></div>
       </form>
@@ -413,6 +448,7 @@ function renderModelPage(model) {
   const form = $('#model-form');
   const refresh = debounce(() => { renderResults(model); renderNav(); }, 120);
   bindFields(form, model.inputs, v, (key, field) => {
+    dropSource(model.id, key, field);
     if (ownDataInputs(model).some(i => i.key === key)) { confirm(model, key); field.classList.remove('is-example'); save(); }
     updateMeter(model);
     refresh();
@@ -431,6 +467,7 @@ function renderModelPage(model) {
     if (!window.confirm(`${model.name} için girdiğiniz tüm veriler örnek değerlere döndürülsün mü?`)) return;
     state.values[model.id] = defaultValues(model.inputs);
     state.confirmed[model.id] = [];
+    state.sources[model.id] = {};
     save();
     renderModelPage(model);
     renderNav();
@@ -656,6 +693,334 @@ function renderDock(model, res, mc, vd) {
   answerObserver.observe($('#answer'));
 }
 
+// ---------- Belge yükleme ----------
+// Hibrit veri girişi: alanlar elle girilebilir ya da belgeler yüklenip önerilen değerler onaylanır.
+// Dosyalar yalnızca tarayıcıda okunur; içerikleri kaydedilmez, yalnızca uygulanan değerin kaynağı saklanır.
+
+const ACCEPT = '.xlsx,.xls,.ods,.csv,.txt,.xml,.htm,.html';
+
+// Belgeden hesaplanan değerler anlamlı basamağa yuvarlanır (ör. 152,17 W → 152,2 W).
+function tidy(input, v) {
+  if (input.step === 1) return Math.round(v);
+  const a = Math.abs(v);
+  const d = a >= 1000 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 3;
+  return Math.round(v * 10 ** d) / 10 ** d;
+}
+const valueText = (input, v) => (input.unit === '%' ? F.pct(v, 1) : `${F.inputNum(tidy(input, v))} ${input.unit}`);
+const TARGET_NAME = Object.fromEntries(TARGETS.map(t => [t.id, t.name]));
+const session = { items: [], seq: 0, applied: null, busy: false };
+
+function computeItem(item) {
+  item.error = null;
+  try {
+    if (item.type === 'elle') item.result = manualResult(item);
+    else item.result = extractorById(item.type).extract(item.files, item.opts, { values: state.values });
+  } catch (e) {
+    item.result = { summary: '', proposals: [], warnings: [], options: [] };
+    item.error = `Belge işlenemedi: ${e.message}`;
+  }
+  item.selected = new Map(item.result.proposals.map(p => [`${p.model}.${p.key}`, check(p).level !== 'error']));
+}
+
+function manualResult(item) {
+  const m = item.manual;
+  const sheet = item.files[0].sheets[m.sheet];
+  const proposals = [];
+  for (const map of m.maps) {
+    if (!map.target || map.col == null) continue;
+    const [model, key] = map.target.split('.');
+    const value = applyOperation(sheet, m.header, Number(map.col), map.op);
+    const colName = columnsOf(sheet, m.header).find(([i]) => i === Number(map.col))?.[1] ?? '';
+    if (value != null) proposals.push({ model, key, value, where: `${sheet.name} · “${colName}” · ${OPERATIONS.find(o => o[0] === map.op)[1].toLowerCase()}` });
+  }
+  return { summary: `${sheet.name} · başlık ${m.header + 1}. satır`, proposals, warnings: [], options: [] };
+}
+
+async function addFiles(fileList) {
+  session.busy = true;
+  session.applied = null;
+  renderImport();
+  for (const f of fileList) {
+    let file;
+    try {
+      file = await readFile(f.name, await f.arrayBuffer());
+    } catch (e) {
+      session.items.push({ id: ++session.seq, files: [{ name: f.name }], type: null, error: e instanceof ReadError ? e.message : `“${f.name}” okunamadı: ${e.message}`, result: null });
+      continue;
+    }
+    const type = detectType(file);
+    const group = extractorById(type)?.group ? session.items.find(it => it.type === type) : null;
+    if (group) {
+      group.files.push(file);
+      computeItem(group);
+      continue;
+    }
+    const item = { id: ++session.seq, files: [file], type, opts: {}, manual: null };
+    if (type === 'elle') initManual(item);
+    computeItem(item);
+    session.items.push(item);
+  }
+  session.busy = false;
+  renderImport();
+}
+
+function initManual(item) {
+  const sheets = item.files[0].sheets;
+  const si = Math.max(0, sheets.findIndex(s => s.rows.length));
+  item.manual = { sheet: si, header: guessHeader(sheets[si]?.rows || []), maps: [{ target: '', col: null, op: 'sum' }] };
+}
+
+function optionHtml(item, o) {
+  const name = `opt-${item.id}-${o.id}`;
+  let control;
+  if (o.type === 'checkbox') control = `<label class="check"><input type="checkbox" id="${name}" data-item="${item.id}" data-opt="${o.id}" ${o.value ? 'checked' : ''}>${esc(o.label)}</label>`;
+  else if (o.type === 'select') control = `<label for="${name}">${esc(o.label)}</label><select id="${name}" data-item="${item.id}" data-opt="${o.id}">${o.choices.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(o.value) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  else control = `<span class="opt-label">${esc(o.label)}</span><div class="multi">${o.choices.map(([v, l], k) => `<label class="check"><input type="checkbox" id="${name}-${k}" data-item="${item.id}" data-multi="${o.id}" value="${esc(v)}" ${o.value.includes(v) ? 'checked' : ''}>${esc(l)}</label>`).join('')}</div>`;
+  return `<div class="opt">${control}${o.help ? `<p class="opt-help">${esc(o.help)}</p>` : ''}</div>`;
+}
+
+function manualHtml(item) {
+  const m = item.manual;
+  const file = item.files[0];
+  const sheet = file.sheets[m.sheet];
+  if (!sheet) return '<p class="soft">Dosyada tablo bulunamadı.</p>';
+  const cols = columnsOf(sheet, m.header);
+  const preview = sheet.rows.slice(m.header, m.header + 6).map((r, k) => `<tr>${cols.map(([i]) => `<${k ? 'td' : 'th'}>${esc(r?.[i]?.v instanceof Date ? r[i].v.toLocaleDateString('tr-TR') : r?.[i]?.v ?? '')}</${k ? 'td' : 'th'}>`).join('')}</tr>`).join('');
+  const targets = TARGETS.map(t => `<optgroup label="${esc(t.name)}">${t.inputs.map(i => `<option value="${t.id}.${i.key}">${esc(i.label)} (${esc(i.unit)})</option>`).join('')}</optgroup>`).join('');
+  const maps = m.maps.map((map, k) => {
+    const value = map.target && map.col != null ? applyOperation(sheet, m.header, Number(map.col), map.op) : null;
+    return `<div class="map-row">
+      <select data-item="${item.id}" data-map="${k}" data-field="target" aria-label="Hedef alan"><option value="">Hedef alan seçin…</option>${targets.replace(`value="${map.target}"`, `value="${map.target}" selected`)}</select>
+      <select data-item="${item.id}" data-map="${k}" data-field="col" aria-label="Sütun"><option value="">Sütun…</option>${cols.map(([i, l]) => `<option value="${i}" ${Number(map.col) === i && map.col != null ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      <select data-item="${item.id}" data-map="${k}" data-field="op" aria-label="İşlem">${OPERATIONS.map(([v, l]) => `<option value="${v}" ${map.op === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <span class="map-value tnum">${value != null ? F.inputNum(Math.round(value * 1000) / 1000) : '—'}</span>
+      <button type="button" class="tool" data-item="${item.id}" data-unmap="${k}" aria-label="Eşleştirmeyi sil">✕</button>
+    </div>`;
+  }).join('');
+  return `
+    <div class="manual">
+      <div class="opt-grid">
+        ${file.sheets.length > 1 ? `<div class="opt"><label for="ms-${item.id}">Sayfa</label><select id="ms-${item.id}" data-item="${item.id}" data-manual="sheet">${file.sheets.map((s, i) => `<option value="${i}" ${i === m.sheet ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
+        <div class="opt"><label for="mh-${item.id}">Başlık satırı</label><input id="mh-${item.id}" type="number" min="1" max="${sheet.rows.length}" value="${m.header + 1}" data-item="${item.id}" data-manual="header"></div>
+      </div>
+      <div class="table-wrap preview"><table>${preview}</table></div>
+      <p class="soft">Her satırda hangi sütundan hangi alanın hesaplanacağını seçin. Altındaki “Toplam” satırları otomatik ayıklanır.</p>
+      ${maps}
+      <button type="button" class="btn quiet" data-item="${item.id}" data-addmap>+ Eşleştirme ekle</button>
+    </div>`;
+}
+
+function itemHtml(item) {
+  const names = item.files.map(f => f.name);
+  const title = names.length > 1 ? `${names.length} dosya` : names[0];
+  if (!item.type) {
+    return `<section class="card import-item error-item"><div class="ii-head">${svg(P.alert)}<div><b>${esc(title)}</b><span class="neg-text">${esc(item.error)}</span></div><button type="button" class="tool" data-remove="${item.id}" aria-label="Kaldır">✕</button></div></section>`;
+  }
+  const r = item.result;
+  const typeSelect = `<select id="type-${item.id}" data-item="${item.id}" data-type aria-label="Belge türü">${[...EXTRACTORS, MANUAL].filter(x => !x.group || x.id === item.type).map(x => `<option value="${x.id}" ${x.id === item.type ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select>`;
+  const props = r.proposals.map(p => {
+    const c = check(p);
+    const input = inputOf(p.model, p.key);
+    return `<li class="${c.level}"><span>${esc(TARGET_NAME[p.model])} · ${esc(input.label)}</span><b class="tnum">${valueText(input, p.value)}</b></li>`;
+  }).join('');
+  return `<section class="card import-item">
+    <div class="ii-head">${svg(P.doc)}<div><b title="${esc(names.join(', '))}">${esc(title)}</b><span>${esc(item.files[0].format)}${names.length > 1 ? ` · ${esc(names.slice(0, 3).join(', '))}${names.length > 3 ? '…' : ''}` : ''}</span></div><button type="button" class="tool" data-remove="${item.id}" aria-label="Kaldır">✕</button></div>
+    <div class="opt"><label for="type-${item.id}">Belge türü</label>${typeSelect}</div>
+    ${item.error ? `<p class="caution">${svg(P.alert)}<span>${esc(item.error)}</span></p>` : ''}
+    ${item.type === 'elle' ? manualHtml(item) : `
+      ${r.summary ? `<p class="ii-summary">${esc(r.summary)}</p>` : ''}
+      ${r.options.length ? `<div class="opt-grid">${r.options.map(o => optionHtml(item, o)).join('')}</div>` : ''}
+      ${props ? `<ul class="ii-props">${props}</ul>` : '<p class="soft">Bu belgeden değer çıkarılamadı. Belge türünü değiştirmeyi ya da “Diğer tablolar” ile sütunları kendiniz eşleştirmeyi deneyin.</p>'}`}
+    ${r.warnings.length ? `<ul class="ii-warn">${r.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+  </section>`;
+}
+
+function reviewHtml() {
+  const rows = [];
+  const seen = new Map();
+  // Aynı alan için birden çok öneri varsa son yüklenen belge öncelikli; diğerleri çakışma olarak gösterilir.
+  for (const item of [...session.items].reverse()) {
+    if (!item.result) continue;
+    for (const p of item.result.proposals) {
+      const k = `${p.model}.${p.key}`;
+      rows.push({ item, p, dup: seen.has(k) });
+      seen.set(k, true);
+    }
+  }
+  if (!rows.length) return '';
+  rows.reverse();
+  let count = 0;
+  const body = rows.map(({ item, p, dup }) => {
+    const input = inputOf(p.model, p.key);
+    const c = check(p);
+    const cur = p.model === 'genel' ? state.globals[p.key] : state.values[p.model][p.key];
+    const on = !dup && item.selected.get(`${p.model}.${p.key}`) && c.level !== 'error';
+    if (on) count++;
+    const status = c.level === 'error' ? `<span class="neg-text">${esc(c.message)}</span>` : dup ? 'Başka belgede de var' : c.level === 'warn' ? `<span class="warn-text">${esc(c.message)}</span>` : 'Uygun';
+    return `<tr class="${dup ? 'dup' : ''}">
+      <td><input type="checkbox" aria-label="${esc(input.label)} uygulansın" data-item="${item.id}" data-pick="${p.model}.${p.key}" ${on ? 'checked' : ''} ${c.level === 'error' || dup ? 'disabled' : ''}></td>
+      <td><b>${esc(input.label)}</b><br><span class="soft">${esc(TARGET_NAME[p.model])}</span></td>
+      <td class="num" data-label="Şu anki">${valueText(input, cur)}</td>
+      <td class="num" data-label="Belgeden"><b>${valueText(input, p.value)}</b></td>
+      <td data-label="Kaynak"><span class="soft">${esc(item.files.map(f => f.name).join(', ').slice(0, 80))}<br>${esc(p.where)}${p.note ? ` · ${esc(p.note)}` : ''}</span></td>
+      <td data-label="Durum">${status}</td>
+    </tr>`;
+  }).join('');
+  return `<section class="card pad review">
+    <h2>Uygulamadan önce kontrol edin</h2>
+    <p class="soft">İşaretli değerler ilgili alanlara yazılır ve alanın altında hangi belgeden geldiği gösterilir. Uygulanan değerleri daha sonra elle de değiştirebilirsiniz.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>Alan</th><th class="num">Şu anki</th><th class="num">Belgeden</th><th>Kaynak</th><th>Durum</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>
+    <div class="review-foot"><button type="button" class="btn primary" id="btn-apply" ${count ? '' : 'disabled'}>${svg(STATUS_ICON.good.match(/d="([^"]+)"/)[1])}Seçilen ${count} değeri uygula</button></div>
+  </section>`;
+}
+
+function applySelected() {
+  const applied = [];
+  const at = new Date().toISOString().slice(0, 10);
+  const done = new Set();
+  for (const item of [...session.items].reverse()) {
+    if (!item.result) continue;
+    for (const p of item.result.proposals) {
+      const k = `${p.model}.${p.key}`;
+      if (done.has(k)) continue;
+      done.add(k);
+      if (!item.selected.get(k) || check(p).level === 'error') continue;
+      const input = inputOf(p.model, p.key);
+      const value = tidy(input, p.value);
+      if (p.model === 'genel') state.globals[p.key] = value;
+      else {
+        state.values[p.model][p.key] = value;
+        if (!state.confirmed[p.model].includes(p.key)) state.confirmed[p.model].push(p.key);
+      }
+      state.sources[p.model][p.key] = { file: item.files.map(f => f.name).join(', ').slice(0, 300), where: p.where + (p.note ? ` · ${p.note}` : ''), at };
+      applied.push({ model: p.model, label: input.label, value, unit: input.unit, step: input.step });
+    }
+  }
+  save();
+  session.items = [];
+  session.applied = applied;
+  renderImport();
+  renderNav();
+  window.scrollTo({ top: 0, behavior: smooth() });
+}
+
+function downloadTemplate(prefill) {
+  const bytes = buildTemplate((m, k) => {
+    if (!prefill) return null;
+    if (m === 'genel') return state.globals[k];
+    const model = modelById(m);
+    return isFilled(model, k) ? state.values[m][k] : null;
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = prefill ? 'akilli-sehir-verileri.xlsx' : 'akilli-sehir-veri-sablonu.xlsx';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function renderImport() {
+  const docs = [...EXTRACTORS, MANUAL].map(x => `<article class="doc card">
+    <h3>${esc(x.title)}</h3>
+    <dl>
+      <div><dt>Doldurduğu alanlar</dt><dd>${esc(x.fills)}</dd></div>
+      <div><dt>Dosya biçimi</dt><dd>${esc(x.formats)}</dd></div>
+      <div><dt>Nereden alınır</dt><dd>${esc(x.source)}</dd></div>
+    </dl>
+    <p class="doc-variants-title">Desteklenen yazım biçimleri</p>
+    <ul>${x.variants.map(v => `<li>${esc(v)}</li>`).join('')}</ul>
+  </article>`).join('');
+
+  const appliedHtml = session.applied ? `<section class="card pad applied" role="status">
+    <h2>${session.applied.length} değer uygulandı</h2>
+    <ul>${session.applied.map(a => `<li><span>${esc(TARGET_NAME[a.model])} · ${esc(a.label)}</span><b class="tnum">${valueText(a, a.value)}</b></li>`).join('')}</ul>
+    <div class="applied-links">${[...new Set(session.applied.map(a => a.model))].filter(m => m !== 'genel').map(m => `<a class="btn" href="#${m}">${esc(TARGET_NAME[m])} sonucunu gör →</a>`).join('')}</div>
+  </section>` : '';
+
+  $('#view').innerHTML = `
+    <div class="intro">
+      <p class="kicker">Belgeden doldur</p>
+      <h1>Belgelerinizi yükleyin</h1>
+      <p>Alanları elle girmek yerine belediyenizin elindeki dosyaları yükleyebilirsiniz. Araç belge türünü tanır, ilgili değerleri hesaplar ve uygulamadan önce size gösterir. İki yolu birlikte de kullanabilirsiniz: belgede olmayan alanları elle tamamlayın.</p>
+    </div>
+    ${appliedHtml}
+    <section class="card pad upload">
+      <label class="dropzone" id="dropzone" for="import-files">
+        ${svg(P.upload)}
+        <b>${session.busy ? 'Dosyalar okunuyor…' : 'Dosyaları buraya bırakın ya da seçin'}</b>
+        <span>Excel (.xlsx, .xls), LibreOffice (.ods), CSV veya e-Fatura XML · birden çok dosya seçilebilir</span>
+        <input id="import-files" type="file" multiple accept="${ACCEPT}" class="sr-only">
+      </label>
+      <p class="privacy">${svg(P.shield)}<span>Dosyalar bu bilgisayarda, tarayıcının içinde okunur; hiçbir sunucuya gönderilmez ve saklanmaz. Yalnızca uyguladığınız değerin hangi dosyadan geldiği not edilir.</span></p>
+      <div class="template-row">
+        <div><b>Belgeleriniz farklı biçimdeyse</b><span>Veri şablonunu indirip ilgili birimlere doldurtun; her alanın nereden bulunacağı şablonda yazar.</span></div>
+        <div class="template-actions"><button type="button" class="btn" data-template="empty">${svg(P.doc)}Boş şablon (.xlsx)</button><button type="button" class="btn quiet" data-template="filled">Girili değerlerle şablon</button></div>
+      </div>
+    </section>
+    ${session.items.length ? `<div class="import-items">${session.items.map(itemHtml).join('')}</div>` : ''}
+    ${reviewHtml()}
+    <h2 class="section-title" style="margin-top:32px">Desteklenen belgeler</h2>
+    <p class="section-sub">Belediyeler aynı veriyi farklı biçimlerde tutabiliyor; her belge türünün yaygın yazım biçimleri ayrı ayrı tanınır. Tanınmayan tablolar için “Diğer tablolar” ile sütunları kendiniz eşleştirebilirsiniz. Eski ikili .xls dosyalarını Excel’de “Farklı Kaydet → .xlsx” ile, PDF’leri ise Excel dökümüyle değiştirin.</p>
+    <div class="doc-grid">${docs}</div>`;
+
+  bindImport();
+}
+
+function bindImport() {
+  const input = $('#import-files');
+  input.addEventListener('change', () => { if (input.files.length) addFiles([...input.files]); });
+  const dz = $('#dropzone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
+
+}
+
+// Belge sayfasındaki seçimler #view üzerinden bir kez dinlenir (sayfa her çizimde yeniden kurulur).
+function setupImportEvents() {
+  const view = $('#view');
+  const itemOf = el => session.items.find(it => it.id === Number(el.dataset.item));
+  view.addEventListener('change', e => {
+    if (currentPage !== 'belgeler') return;
+    const el = e.target;
+    const item = el.dataset.item && itemOf(el);
+    if (el.dataset.pick && item) { item.selected.set(el.dataset.pick, el.checked); renderImport(); return; }
+    if (!item) return;
+    if (el.hasAttribute('data-type')) {
+      item.type = el.value;
+      item.opts = {};
+      if (item.type === 'elle' && !item.manual) initManual(item);
+    } else if (el.dataset.opt) {
+      item.opts[el.dataset.opt] = el.type === 'checkbox' ? el.checked : el.value;
+    } else if (el.dataset.multi) {
+      item.opts[el.dataset.multi] = [...view.querySelectorAll(`[data-item="${item.id}"][data-multi="${el.dataset.multi}"]:checked`)].map(x => x.value);
+    } else if (el.dataset.manual === 'sheet') {
+      item.manual.sheet = Number(el.value);
+      item.manual.header = guessHeader(item.files[0].sheets[item.manual.sheet].rows);
+      item.manual.maps = [{ target: '', col: null, op: 'sum' }];
+    } else if (el.dataset.manual === 'header') {
+      item.manual.header = Math.max(0, Number(el.value) - 1);
+    } else if (el.dataset.map != null) {
+      const map = item.manual.maps[Number(el.dataset.map)];
+      map[el.dataset.field] = el.dataset.field === 'col' ? (el.value === '' ? null : Number(el.value)) : el.value;
+    } else return;
+    computeItem(item);
+    renderImport();
+  });
+  view.addEventListener('click', e => {
+    if (currentPage !== 'belgeler') return;
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.remove) { session.items = session.items.filter(it => it.id !== Number(t.dataset.remove)); renderImport(); }
+    else if (t.hasAttribute('data-addmap')) { itemOf(t).manual.maps.push({ target: '', col: null, op: 'sum' }); renderImport(); }
+    else if (t.dataset.unmap != null) { const it = itemOf(t); it.manual.maps.splice(Number(t.dataset.unmap), 1); computeItem(it); renderImport(); }
+    else if (t.dataset.template) downloadTemplate(t.dataset.template === 'filled');
+    else if (t.id === 'btn-apply') applySelected();
+  });
+}
+
 // ---------- Karşılaştırma ----------
 
 function renderCompare() {
@@ -765,6 +1130,7 @@ function rerenderCurrent() {
   if (m) renderResults(m);
   else if (currentPage === 'karsilastirma') renderCompare();
   else if (currentPage === 'baslangic') renderStart();
+  else if (currentPage === 'belgeler') renderImport();
   renderNav();
 }
 
@@ -777,7 +1143,8 @@ function setupSettings() {
     $('#g-preparer').value = state.preparer;
   };
   // Girdiler state.globals nesnesine bağlıdır; sıfırlama ve yükleme bu nesneyi yerinde günceller.
-  bindFields(fields, GLOBAL_INPUTS, state.globals, debounce(rerenderCurrent, 150));
+  const refreshGlobals = debounce(rerenderCurrent, 150);
+  bindFields(fields, GLOBAL_INPUTS, state.globals, (key, field) => { dropSource('genel', key, field); refreshGlobals(); });
   $('#g-municipality').addEventListener('input', e => { state.municipality = e.target.value.slice(0, 120); save(); renderNav(); });
   $('#g-preparer').addEventListener('input', e => { state.preparer = e.target.value.slice(0, 120); save(); });
   $('#btn-reset-all').addEventListener('click', () => {
@@ -785,6 +1152,7 @@ function setupSettings() {
     const fresh = freshState();
     Object.assign(state.globals, fresh.globals);
     for (const m of MODELS) { Object.assign(state.values[m.id], fresh.values[m.id]); state.confirmed[m.id] = []; }
+    for (const t of TARGETS) state.sources[t.id] = {};
     state.municipality = '';
     state.preparer = '';
     save();
@@ -813,6 +1181,7 @@ async function loadFile(file) {
     Object.assign(state.include, loaded.include);
     Object.assign(state.basis, loaded.basis);
     Object.assign(state.confirmed, loaded.confirmed);
+    Object.assign(state.sources, loaded.sources);
     state.municipality = loaded.municipality;
     state.preparer = loaded.preparer;
     save();
@@ -861,6 +1230,7 @@ function setupActions(openSettings) {
 // ---------- Başlat ----------
 
 setupActions(setupSettings());
+setupImportEvents();
 installTooltips();
 window.addEventListener('hashchange', route);
 let lastWidth = window.innerWidth;
