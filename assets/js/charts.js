@@ -51,7 +51,9 @@ function wrap(text, maxChars) {
 const tipAttr = html => `data-tip="${escapeHtml(html)}"`;
 
 // Çizgi grafiği: yıllara göre birden fazla seri (ör. kümülatif nakit akışı).
-export function lineChart({ width, height = 260, series, xLabel = t => `${t}. yıl`, fmt }) {
+// area: true ise her serinin altı yumuşak bir renk geçişiyle doldurulur.
+// markers: [{ t, value, label }] – ör. geri ödeme noktası; t yıl cinsinden kesirli olabilir.
+export function lineChart({ width, height = 260, series, xLabel = t => `${t}. yıl`, fmt, area = false, markers = [] }) {
   const m = { l: 64, r: 16, t: 12, b: 30 };
   const n = series[0].values.length;
   const all = series.flatMap(s => s.values).concat(0);
@@ -67,11 +69,23 @@ export function lineChart({ width, height = 260, series, xLabel = t => `${t}. y�
   }
   for (let t = 0; t < n; t += xStep) g += `<text class="tick" x="${x(t)}" y="${height - 8}" text-anchor="middle">${t}</text>`;
 
+  if (area) {
+    g += `<defs>${series.map(s => `<linearGradient id="area-${s.cls}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="stop-${s.cls}" stop-opacity="0.22"/><stop offset="1" class="stop-${s.cls}" stop-opacity="0"/></linearGradient>`).join('')}</defs>`;
+  }
   for (const s of series) {
     const d = s.values.map((v, t) => `${t ? 'L' : 'M'}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join('');
+    if (area) g += `<path class="area" fill="url(#area-${s.cls})" d="${d}L${x(n - 1)},${y(lo)}L${x(0)},${y(lo)}Z"/>`;
     g += `<path class="line ${s.cls}" d="${d}"/>`;
     const last = s.values.length - 1;
     g += `<circle class="dot ${s.cls}" cx="${x(last)}" cy="${y(s.values[last])}" r="4"/>`;
+  }
+
+  for (const mk of markers) {
+    const mx = x(mk.t), my = y(mk.value);
+    const anchor = mx > width - 120 ? 'end' : mx < m.l + 60 ? 'start' : 'middle';
+    g += `<line class="marker-line" x1="${mx}" x2="${mx}" y1="${my}" y2="${height - m.b}"/>`;
+    g += `<circle class="marker-dot" cx="${mx}" cy="${my}" r="5"/>`;
+    g += `<text class="marker-label" x="${mx}" y="${my - 12}" text-anchor="${anchor}">${escapeHtml(mk.label)}</text>`;
   }
 
   // Yıl sütunları: dikey kılavuz ve ipucu
@@ -157,6 +171,19 @@ export function histogram({ width, height = 220, samples, bins = 30, fmt }) {
     g += `<line class="ref" x1="${x(0)}" x2="${x(0)}" y1="${m.t}" y2="${height - m.b}"/>`;
   }
   return `<svg xmlns="${NS}" class="chart" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">${g}</svg>`;
+}
+
+// Halka gösterge: 0–1 arası oran (ör. olumlu sonuç olasılığı).
+export function gauge({ value, size = 132, stroke = 10, label = '' }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(1, value));
+  return `<svg xmlns="${NS}" class="gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${escapeHtml(label)}">
+    <defs><linearGradient id="gauge-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="g-stop-a"/><stop offset="1" class="g-stop-b"/></linearGradient></defs>
+    <circle class="gauge-track" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}" fill="none"/>
+    <circle class="gauge-arc" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-width="${stroke}" fill="none" stroke="url(#gauge-grad)"
+      stroke-linecap="round" stroke-dasharray="${(c * v).toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+  </svg>`;
 }
 
 // Belge genelinde tek bir ipucu kutusu; [data-tip] taşıyan öğelerin üzerine gelindiğinde gösterilir.

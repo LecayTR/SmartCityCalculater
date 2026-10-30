@@ -1,58 +1,81 @@
 <!doctype html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Akıllı Şehir Yatırım Analizi</title>
   <meta name="description" content="Belediyeler için akıllı aydınlatma, akıllı su yönetimi, akıllı atık toplama ve akıllı trafik yatırımlarının geri ödeme süresi, net bugünkü değer ve toplumsal fayda hesaplayıcısı.">
-  <meta name="theme-color" content="#1c5cab">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231c5cab'/%3E%3Cpath d='M7 24V14h4v10zm7 0V8h4v16zm7 0v-7h4v7z' fill='%23fff'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#070b14">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233987e5'/%3E%3Cstop offset='1' stop-color='%2319b58a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M7 24V15h4v9zm7 0V8h4v16zm7 0v-6h4v6z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="assets/css/style.css">
+  <script>
+    // Tema, sayfa çizilmeden önce uygulanır (yanıp sönmeyi önler). Varsayılan: koyu.
+    try { const t = localStorage.getItem('akilli-sehir-tema'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
   <script type="module" src="assets/js/app.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1c5cab"/><path d="M7 24V14h4v10zm7 0V8h4v16zm7 0v-7h4v7z" fill="#fff"/></svg>
-      <div>
-        <strong>Akıllı Şehir Yatırım Analizi</strong>
-        <span><span class="municipality-name" data-bind="municipality"></span>Belediyeler için ön fizibilite hesaplayıcısı</span>
+  <div class="app">
+    <aside class="sidebar" aria-label="Ana menü">
+      <a class="brand" href="#aydinlatma">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 24V15h4v9zm7 0V8h4v16zm7 0v-6h4v6z"/></svg></span>
+        <span><strong>Akıllı Şehir</strong><small>Yatırım Analizi</small></span>
+      </a>
+      <div class="municipality" data-bind="municipality" hidden></div>
+      <nav class="side-nav" id="side-nav"></nav>
+      <div class="side-actions">
+        <button class="side-btn" type="button" data-action="settings"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.7a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg>Genel ayarlar</button>
+        <button class="side-btn" type="button" data-action="save"><svg viewBox="0 0 24 24"><path d="M12 3v11.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3zM4 19h16v2H4z"/></svg>Kaydet</button>
+        <label class="side-btn"><svg viewBox="0 0 24 24"><path d="M12 21V9.8l3.6 3.6L17 12l-6-6-6 6 1.4 1.4L11 9.8V21zM4 3h16v2H4z"/></svg>Yükle<input type="file" class="sr-only" data-action="load" accept="application/json,.json"></label>
+        <button class="side-btn" type="button" data-action="theme"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>Tema</button>
+        <button class="side-btn primary" type="button" data-action="print"><svg viewBox="0 0 24 24"><path d="M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z"/></svg>Rapor / PDF</button>
       </div>
+    </aside>
+
+    <div class="main">
+      <header class="mobile-top">
+        <a class="brand" href="#aydinlatma">
+          <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 24V15h4v9zm7 0V8h4v16zm7 0v-6h4v6z"/></svg></span>
+          <span><strong>Akıllı Şehir</strong><small data-bind="municipality-short">Yatırım Analizi</small></span>
+        </a>
+        <div class="mobile-actions">
+          <button class="icon-btn" type="button" data-action="settings" aria-label="Genel ayarlar"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.7a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
+          <button class="icon-btn" type="button" data-action="theme" aria-label="Tema"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
+          <button class="icon-btn" type="button" data-action="print" aria-label="Rapor / PDF"><svg viewBox="0 0 24 24"><path d="M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z"/></svg></button>
+        </div>
+      </header>
+
+      <main id="view">
+        <noscript><p>Bu hesaplayıcı JavaScript gerektirir. Lütfen tarayıcınızda JavaScript’i etkinleştirin.</p></noscript>
+      </main>
+
+      <footer class="site-foot">
+        Bu araç bir ön fizibilite aracıdır; sonuçlar girilen veri ve varsayımlar kadar güvenilirdir. Yatırım kararından önce pilot uygulama ölçümleri ve ayrıntılı fizibilite etüdü ile doğrulanmalıdır.
+        Girdiler yalnızca bu tarayıcıda saklanır, hiçbir sunucuya gönderilmez.
+      </footer>
     </div>
-    <div class="actions">
-      <button class="btn" type="button" id="btn-settings" aria-label="Genel ayarlar"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.7a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg><span class="lbl">Genel ayarlar</span></button>
-      <button class="btn" type="button" id="btn-save" title="Tüm girdileri dosyaya kaydet" aria-label="Kaydet"><svg viewBox="0 0 24 24"><path d="M12 3v11.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3zM4 19h16v2H4z"/></svg><span class="lbl">Kaydet</span></button>
-      <label class="btn" title="Kaydedilmiş dosyayı yükle" aria-label="Yükle"><svg viewBox="0 0 24 24"><path d="M12 21V9.8l3.6 3.6L17 12l-6-6-6 6 1.4 1.4L10 9.8V21zM4 3h16v2H4z" transform="translate(1 0)"/></svg><span class="lbl">Yükle</span><input type="file" id="file-load" accept="application/json,.json" class="sr-only"></label>
-      <button class="btn primary" type="button" id="btn-print" aria-label="Rapor / PDF"><svg viewBox="0 0 24 24"><path d="M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z"/></svg><span class="lbl">Rapor / PDF</span></button>
-      <button class="btn ghost" type="button" id="btn-theme" aria-label="Açık/koyu tema"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
-    </div>
-  </header>
+  </div>
 
-  <nav class="tabs" id="tabs" aria-label="Bölümler"></nav>
-
-  <main id="view">
-    <noscript><p>Bu hesaplayıcı JavaScript gerektirir. Lütfen tarayıcınızda JavaScript’i etkinleştirin.</p></noscript>
-  </main>
-
-  <footer class="site-foot">
-    Bu araç bir ön fizibilite aracıdır; sonuçlar girilen veri ve varsayımlar kadar güvenilirdir. Yatırım kararından önce pilot uygulama ölçümleri ve ayrıntılı fizibilite etüdü ile doğrulanmalıdır.
-    Girdiler yalnızca bu tarayıcıda saklanır, hiçbir sunucuya gönderilmez.
-  </footer>
+  <div class="live-bar" id="live-bar" aria-hidden="true"></div>
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Bölümler"></nav>
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form method="dialog">
       <div class="dlg-head">
-        <h2 id="settings-title" style="font-size:17px">Genel ayarlar</h2>
-        <button class="btn ghost" value="close" aria-label="Kapat">✕</button>
+        <div><div class="eyebrow">Tüm yatırımlar için</div><h2 id="settings-title">Genel ayarlar</h2></div>
+        <button class="icon-btn" value="close" aria-label="Kapat">✕</button>
       </div>
       <div class="dlg-body">
         <div class="field">
           <label for="g-municipality">Belediye adı (raporda görünür)</label>
-          <input class="text-input" id="g-municipality" type="text" placeholder="ör. Örnekşehir Belediyesi" autocomplete="organization">
+          <div class="input-wrap"><input id="g-municipality" type="text" placeholder="ör. Örnekşehir Belediyesi" autocomplete="organization"></div>
         </div>
         <div class="field">
           <label for="g-preparer">Hazırlayan birim / kişi</label>
-          <input class="text-input" id="g-preparer" type="text" placeholder="ör. Strateji Geliştirme Dairesi">
+          <div class="input-wrap"><input id="g-preparer" type="text" placeholder="ör. Strateji Geliştirme Dairesi"></div>
         </div>
         <div id="global-fields"></div>
       </div>

@@ -4,20 +4,25 @@ Belediye personeli ve yöneticileri için web tabanlı ön fizibilite hesaplayı
 
 ## Tasarımlar
 
-Aynı hesap motorunu kullanan iki arayüz tasarımı ayrı dallarda tutulur:
+Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kullanan iki arayüz tasarımı ayrı dallarda tutulur. Hesap sonuçları iki tasarımda birebir aynıdır; yalnızca sunum farklıdır.
 
 | Dal | Tasarım |
 |---|---|
-| [`ccr-32c2df3d-ftrlux`](../../tree/ccr-32c2df3d-ftrlux) | **v1 – Klasik:** sade, rapor odaklı, açık/koyu tema (bu dal) |
-| [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi:** koyu, gösterge paneli tarzı, etkileşimli |
+| [`ccr-32c2df3d-ftrlux`](../../tree/ccr-32c2df3d-ftrlux) | **v1 – Klasik:** sade, rapor odaklı, üst sekmeli; açık/koyu tema |
+| [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi (bu dal):** koyu gösterge paneli, kenar menüde canlı durum ışıkları, büyük sonuç paneli ve olasılık halkası, literatür aralığını gösteren kaydırıcılar, sekmeli analiz, kaydırınca beliren canlı sonuç çubuğu; açık tema seçeneği |
 
-**v1 – Klasik**
+### Yan yana
 
-| Masaüstü | Mobil |
+| v1 – Klasik | v2 – Kontrol Merkezi |
 |---|---|
-| ![v1 aydınlatma](docs/ekran-goruntuleri/v1-masaustu-aydinlatma.png) | <img src="docs/ekran-goruntuleri/v1-mobil-su.png" width="260" alt="v1 mobil"> |
-| ![v1 trafik, koyu tema](docs/ekran-goruntuleri/v1-masaustu-trafik.png) | |
-| ![v1 karşılaştırma](docs/ekran-goruntuleri/v1-masaustu-karsilastirma.png) | |
+| ![v1 aydınlatma](docs/ekran-goruntuleri/v1-masaustu-aydinlatma.png) | ![v2 aydınlatma](docs/ekran-goruntuleri/v2-masaustu-aydinlatma.png) |
+| ![v1 trafik](docs/ekran-goruntuleri/v1-masaustu-trafik.png) | ![v2 trafik](docs/ekran-goruntuleri/v2-masaustu-trafik.png) |
+| ![v1 karşılaştırma](docs/ekran-goruntuleri/v1-masaustu-karsilastirma.png) | ![v2 karşılaştırma](docs/ekran-goruntuleri/v2-masaustu-karsilastirma.png) |
+| <img src="docs/ekran-goruntuleri/v1-mobil-su.png" width="260" alt="v1 mobil"> | <img src="docs/ekran-goruntuleri/v2-mobil-su.png" width="260" alt="v2 mobil"> |
+
+v2 açık tema:
+
+![v2 açık tema](docs/ekran-goruntuleri/v2-masaustu-su-acik-tema.png)
 
 ## Kapsanan yatırımlar
 
@@ -43,7 +48,7 @@ Formüller, varsayımların dayanakları, kaynakça ve sınırlamalar uygulamada
 
 ## Teknik yapı
 
-Sunucu tarafı kod, veritabanı veya derleme adımı yoktur; saf HTML/CSS/JavaScript (ES modülleri) ile yazılmış statik bir sitedir. Bu yüzden herhangi bir web barındırma hizmetinde çalışır.
+Sunucu tarafı kod, veritabanı veya derleme adımı yoktur; saf HTML/CSS/JavaScript (ES modülleri) ile yazılmış statik bir sitedir. Bu yüzden herhangi bir web barındırma hizmetinde çalışır. v2 tasarımı yazı tipleri (Inter, Space Grotesk) için Google Fonts kullanır; internet bağlantısı yoksa sistem yazı tipine düşer.
 
 ```
 index.html             Sayfa iskeleti ve Yöntem/Kaynaklar metni
