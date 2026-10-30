@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Akıllı Şehir Yatırım Rehberi</title>
+  <meta name="description" content="Belediyeler için akıllı aydınlatma, akıllı su yönetimi, akıllı atık toplama ve akıllı trafik yatırımlarının geri ödeme süresi, net bugünkü değer ve toplumsal fayda hesaplayıcısı.">
+  <meta name="theme-color" content="#f4f2ec">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='10' fill='%232e6b5e'/%3E%3Cpath d='M8 23V15h3.5v8zm6.25 0V9h3.5v14zM20.5 23v-5H24v5z' fill='%23fffefa'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>
+    // Kaydedilmiş tema sayfa çizilmeden uygulanır; yoksa işletim sistemi tercihi geçerlidir.
+    try { const t = localStorage.getItem('akilli-sehir-tema-v3'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  <script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#view">İçeriğe geç</a>
+  <header class="site-head">
+    <div class="head-row">
+      <a class="brand" href="#baslangic">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 23V15h3.5v8zm6.25 0V9h3.5v14zM20.5 23v-5H24v5z"/></svg></span>
+        <span class="brand-text"><strong>Akıllı Şehir</strong><small data-bind="municipality">Yatırım Rehberi</small></span>
+      </a>
+      <div class="head-actions">
+        <button class="tool" type="button" data-action="settings" title="Genel ayarlar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.7a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg><span class="lbl">Ayarlar</span></button>
+        <button class="tool" type="button" data-action="save" title="Tüm girdileri dosyaya kaydet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3zM4 19h16v2H4z"/></svg><span class="lbl">Kaydet</span></button>
+        <label class="tool" title="Kaydedilmiş dosyayı yükle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9.8l3.6 3.6L17 12l-6-6-6 6 1.4 1.4L11 9.8V21zM4 3h16v2H4z"/></svg><span class="lbl">Yükle</span><input type="file" class="sr-only" data-action="load" accept="application/json,.json"></label>
+        <button class="tool" type="button" data-action="theme" aria-label="Açık / koyu tema"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
+        <button class="btn primary" type="button" data-action="print"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z"/></svg><span class="lbl">Rapor al</span></button>
+      </div>
+    </div>
+    <nav class="main-nav" id="main-nav" aria-label="Bölümler"></nav>
+  </header>
+
+  <main id="view" tabindex="-1">
+    <noscript><p>Bu hesaplayıcı JavaScript gerektirir. Lütfen tarayıcınızda JavaScript’i etkinleştirin.</p></noscript>
+  </main>
+
+  <footer class="site-foot">
+    <p>Bu araç bir ön fizibilite aracıdır; sonuçlar girilen veri ve varsayımlar kadar güvenilirdir. Yatırım kararından önce pilot uygulama ölçümleri ve ayrıntılı fizibilite etüdü ile doğrulanmalıdır. Girdiler yalnızca bu tarayıcıda saklanır, hiçbir sunucuya gönderilmez.</p>
+  </footer>
+
+  <div class="answer-dock" id="answer-dock" hidden></div>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form method="dialog">
+      <div class="dlg-head">
+        <div><p class="kicker">Tüm yatırımlar için</p><h2 id="settings-title">Genel ayarlar</h2></div>
+        <button class="tool" value="close" aria-label="Kapat">✕</button>
+      </div>
+      <div class="dlg-body">
+        <div class="field">
+          <label for="g-municipality">Belediye adı (raporda görünür)</label>
+          <div class="input-wrap"><input id="g-municipality" type="text" placeholder="ör. Örnekşehir Belediyesi" autocomplete="organization"></div>
+        </div>
+        <div class="field">
+          <label for="g-preparer">Hazırlayan birim / kişi</label>
+          <div class="input-wrap"><input id="g-preparer" type="text" placeholder="ör. Strateji Geliştirme Dairesi"></div>
+        </div>
+        <div id="global-fields"></div>
+      </div>
+      <div class="dlg-foot">
+        <button class="btn" type="button" id="btn-reset-all">Tüm girdileri sıfırla</button>
+        <button class="btn primary" value="close">Tamam</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="tpl-yontem">
+    <div class="prose">
+      <div class="page-head">
+        <h1>Yöntem ve kaynaklar</h1>
+        <p>Hesaplayıcının kullandığı formüller, varsayımların dayanakları ve sonuçların hangi koşullarda geçerli olduğu.</p>
+      </div>
+
+      <h2>1. Araç ne yapar, ne yapmaz?</h2>
+      <p>Belediye, mevcut durumunu (tüketim, gider, envanter) ve düşündüğü yatırımın maliyetlerini girer. Araç bu verilerden yatırımın yıllık etkisini, kaç yılda kendini amorti ettiğini ve ekonomik açıdan anlamlı olup olmadığını hesaplar; farklı yatırımları aynı ölçütlerle karşılaştırır.</p>
+      <p>Sonuçlar <strong>ön fizibilite</strong> niteliğindedir: kesin bir getiri taahhüdü değil, mevcut bilgiyle en makul tahmin ve bu tahminin ne kadar sağlam olduğunun göstergesidir. Kesinliği artırmanın yolu, etki varsayımlarını küçük ölçekli bir pilot uygulamada ölçüp araca geri girmektir.</p>
+
+      <h2>2. Nakit akışı</h2>
+      <p>Her yatırım için 0. yılda yatırım harcaması, 1.–N. yıllarda ise yıllık etkiler yazılır (N: ekonomik ömür). Enerji, yakıt ve su fiyatına bağlı kalemler her yıl girilen reel fiyat artışı (g) kadar büyür; bakım ve personel gibi kalemler sabit fiyatla alınır.</p>
+      <div class="formula">Akış₀ = −Yatırım
+Akışₜ = Σ (fiyata bağlı kalem × (1+g)^(t−1)) + Σ (sabit kalem),   t = 1 … N</div>
+
+      <h2>3. Hesaplanan göstergeler</h2>
+      <div class="formula">Net bugünkü değer      NBD = Σ Akışₜ / (1+r)^t
+İç verim oranı          İVO: NBD(İVO) = 0
+Basit geri ödeme        Kümülatif akışın sıfırı geçtiği an (yıl içi doğrusal)
+İskontolu geri ödeme    Kümülatif iskontolu akışın sıfırı geçtiği an
+Fayda / maliyet oranı   F/M = BD(faydalar) / [Yatırım + BD(işletme giderleri)]
+Yıllık eşdeğer değer    YED = NBD × r / (1 − (1+r)^−N)</div>
+      <p><strong>Nasıl okunur?</strong> NBD &gt; 0 ise yatırım, paranın zaman değeri dikkate alındıktan sonra bile kendini karşılar ve üzerine değer yaratır. F/M &gt; 1 aynı anlama gelir. İVO, iskonto oranıyla kıyaslanır: İVO &gt; r ise yatırım kabul edilebilir. Ömürleri farklı yatırımlar karşılaştırılırken NBD yerine yıllık eşdeğer değere bakmak daha adildir.</p>
+
+      <h2>4. Mali analiz ile toplumsal analiz</h2>
+      <p>Avrupa Komisyonu’nun maliyet-fayda analizi rehberine <a class="chip" href="#yontem/S1">S1</a> uygun olarak iki ayrı bakış açısı hesaplanır:</p>
+      <ul>
+        <li><strong>Mali analiz (belediye kasası):</strong> Yalnızca belediye bütçesine giren ve çıkan paralar. Hibe, belediyenin yatırım payından düşülür. Kaçak/ölçülemeyen suyun faturalanması gibi gelirler buraya yazılır.</li>
+        <li><strong>Toplumsal (sosyo-ekonomik) analiz:</strong> Şehrin tamamı açısından yaratılan değer: vatandaşın zaman kazancı, sürücülerin yakıt tasarrufu, diğer kamu kurumlarının tasarrufu ve azaltılan CO₂’nin değeri eklenir. Hibe ve tarifeyle tahsil edilen gelir artışı, bir kesimden diğerine aktarılan <em>transfer</em> olduğu için bu analizde sayılmaz; toplumsal analizde yakıt fiyatları vergisiz alınır.</li>
+      </ul>
+      <p>Bu ayrım, özellikle akıllı trafik gibi faydası belediye kasasına değil vatandaşa giden yatırımlarda kritiktir: mali NBD negatif, toplumsal NBD yüksek pozitif olabilir. Böyle bir yatırım “kendini amorti etmez” ama kamu yararı gerekçesiyle savunulabilir.</p>
+
+      <h2>5. Belirsizlik: sonuç ne kadar güvenilir?</h2>
+      <h3>Monte Carlo simülasyonu</h3>
+      <p>Etki varsayımları (tasarruf oranları vb.) literatür aralıklarında, kullanıcının girdiği değer en olası değer olacak şekilde <strong>üçgen dağılımla</strong> 2.000 kez rastgele seçilir. Ayrıca her simülasyonda enerji fiyat artışı (−%1 ile +%3 arası) ve yatırım maliyeti sapması (−%5 ile +%30 arası) değişir. Maliyet sapmasının yukarı yönde daha geniş tutulması, kamu yatırımlarında maliyetlerin sistematik olarak düşük tahmin edildiğine dair bulgulara dayanır <a class="chip" href="#yontem/S11">S11</a>.</p>
+      <p>Sonuç olarak “NBD’nin pozitif çıkma olasılığı” ile P10 (kötümser), P50 (ortanca) ve P90 (iyimser) değerleri raporlanır. Simülasyon sabit bir tohumla çalıştığından aynı girdiler her zaman aynı sonucu verir.</p>
+      <h3>Duyarlılık (tornado) ve başabaş analizi</h3>
+      <p>Her belirsiz parametre, diğerleri sabitken aralığının alt ve üst ucuna çekilir ve NBD’deki değişim gösterilir; sonucu en çok etkileyen varsayım en üstte yer alır. Başabaş analizi ise NBD’yi sıfırlayan parametre değerini bulur: “Tasarruf oranı en az %X olursa yatırım kendini karşılar” veya “maliyet %Y’ye kadar aşılsa bile yatırım kârlı kalır” gibi.</p>
+
+      <h2>6. Yatırım modelleri</h2>
+      <h3>Akıllı aydınlatma</h3>
+      <div class="formula">Mevcut tüketim (kWh) = Armatür × Güç(kW) × Yanma saati
+Yeni tüketim        = Mevcut × (1 − LED tasarrufu) × (1 − Kısma tasarrufu)
+Yıllık fayda        = (Mevcut − Yeni) × Birim fiyat + Bakım × Bakım azalması − Lisans gideri
+CO₂ (ton)           = Tasarruf (kWh) × Şebeke emisyon faktörü / 1000</div>
+      <p>LED dönüşümüyle %50–70, akıllı kontrollerle %80’e varan tasarruf raporlanmıştır <a class="chip" href="#yontem/S2">S2</a>. Cadde-sokak aydınlatma bedelinin belediye dışında bir bütçeden ödendiği durumlar için “belediye bütçesine yansıyan pay” girdisi kullanılır; kalan kısım toplumsal analizde kamu tasarrufu olarak sayılır.</p>
+
+      <h3>Akıllı su yönetimi</h3>
+      <div class="formula">Kayıp (m³)          = Sisteme verilen su × Kayıp oranı
+Fiziki kayıp        = Kayıp × Fiziki pay              → önlenen kısım × üretim maliyeti
+İdari kayıp         = Kayıp − Fiziki kayıp            → geri kazanılan kısım × tarife × sayaç kapsama oranı
+Diğer faydalar      = Onarım gideri × arıza azalması + Sayaç × okuma gideri × okuma azalması</div>
+      <p>Kayıpların fiziki ve idari olarak ayrılması IWA standart su dengesine dayanır <a class="chip" href="#yontem/S3">S3</a>. Fiziki kayıp üretimin değişken maliyetiyle, idari kayıp satış tarifesiyle değerlendirilir <a class="chip" href="#yontem/S4">S4</a>. Belediyeler, su kayıp oranlarını yönetmelik gereği yıllık olarak raporlamaktadır <a class="chip" href="#yontem/S5">S5</a>; bu raporlar aracın en önemli veri kaynağıdır.</p>
+
+      <h3>Akıllı atık toplama</h3>
+      <div class="formula">Etkin azalma        = Sensörlü rotalarda mesafe azalması × Sensörlü rota payı
+Önlenen km          = Araç × Yıllık km × Etkin azalma
+Yıllık fayda        = Önlenen km × (Yakıt tüketimi × Yakıt fiyatı + Bakım/km)
+                    + Personel gideri × Etkin azalma × Personele yansıma − Lisans gideri</div>
+      <p>Doluluk sensörleri ve dinamik rota planlamasıyla toplama mesafesi ve yakıtta kayda değer azalmalar raporlanmıştır <a class="chip" href="#yontem/S6">S6</a>. Personel tasarrufu ancak vardiya veya fazla mesai azaldığında gerçekleştiği için ayrı bir “yansıma oranı” ile sınırlandırılır.</p>
+
+      <h3>Akıllı trafik</h3>
+      <div class="formula">Kazanılan araç-saat = Günlük araç × Koridor süresi × Süre azalması × Gün sayısı
+Zaman faydası       = Araç-saat × Doluluk × Zaman değeri
+Yakıt faydası       = Araç-saat × Gecikmede yakıt tüketimi × Vergisiz yakıt fiyatı</div>
+      <p>Adaptif sinyal kontrolüyle seyahat süresinde ortalama %10’un üzerinde iyileşme raporlanmıştır <a class="chip" href="#yontem/S7">S7</a>. Zaman değeri için kişisel yolculuklarda saatlik gelirin yaklaşık yarısını kullanan yaklaşım esas alınmıştır <a class="chip" href="#yontem/S8">S8</a>. Yakıt kaynaklı CO₂ için IPCC varsayılan emisyon faktörleri kullanılır <a class="chip" href="#yontem/S9">S9</a>.</p>
+
+      <h2>7. Veriler nereden alınır?</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Yatırım</th><th>Gerekli veri</th><th>Tipik kaynak birim</th></tr></thead>
+          <tbody>
+            <tr><td>Aydınlatma</td><td>Armatür envanteri ve güçleri, elektrik faturaları, bakım kayıtları</td><td>Fen İşleri / Elektrik birimi, Mali Hizmetler, elektrik dağıtım şirketi</td></tr>
+            <tr><td>Su</td><td>Yıllık su denetimi (kayıp) raporu, üretim maliyetleri, tarife, arıza kayıtları, abone sayısı</td><td>Su ve Kanalizasyon İdaresi / Su İşleri</td></tr>
+            <tr><td>Atık</td><td>Araç sayısı, kilometre ve yakıt kayıtları, personel giderleri, konteyner envanteri</td><td>Temizlik İşleri, Makine İkmal, araç takip sistemi</td></tr>
+            <tr><td>Trafik</td><td>Kavşak envanteri, trafik sayımları, seyahat süreleri, bakım giderleri</td><td>Ulaşım Dairesi / UKOME, trafik sinyalizasyon birimi</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>8. Sınırlamalar</h2>
+      <ul>
+        <li>Varsayılan değerler <strong>örnektir</strong>; gerçek belediye verisi değildir. Her belediye kendi verilerini girmelidir.</li>
+        <li>Literatürdeki etki oranları farklı ülke ve şehirlerden derlenmiştir; yerel koşullarda farklı gerçekleşebilir. Bu nedenle belirsizlik analizi sonuçla birlikte okunmalıdır.</li>
+        <li>Finansman (kredi faizi ve geri ödeme planı), vergi etkileri, ömür sonu hurda/kalan değer ve ara yenileme yatırımları modele dahil değildir.</li>
+        <li>Toplumsal analiz, gölge fiyat (dönüşüm faktörü) uygulamaz; belediyenin ödediği yakıt ve enerji fiyatlarındaki vergiler sadeleştirme amacıyla düzeltilmemiştir.</li>
+        <li>Güvenlik, hizmet kalitesi, vatandaş memnuniyeti, gürültü ve hava kirliliği gibi parasallaştırılması güç faydalar hesaba katılmamıştır; bu nedenle toplumsal fayda temkinli tahmindir.</li>
+      </ul>
+
+      <h2 id="kaynaklar">9. Kaynaklar</h2>
+      <ol class="sources" id="source-list"></ol>
+    </div>
+  </template>
+</body>
+</html>
