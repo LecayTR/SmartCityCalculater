@@ -4,25 +4,46 @@ Belediye personeli ve yöneticileri için web tabanlı ön fizibilite hesaplayı
 
 ## Tasarımlar
 
-Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kullanan iki arayüz tasarımı ayrı dallarda tutulur. Hesap sonuçları iki tasarımda birebir aynıdır; yalnızca sunum farklıdır.
+Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kullanan üç arayüz tasarımı ayrı dallarda tutulur. Hesap sonuçları üç tasarımda birebir aynıdır; yalnızca sunum ve kullanım akışı farklıdır.
 
 | Dal | Tasarım |
 |---|---|
 | [`ccr-32c2df3d-ftrlux`](../../tree/ccr-32c2df3d-ftrlux) | **v1 – Klasik:** sade, rapor odaklı, üst sekmeli; açık/koyu tema |
-| [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi (bu dal):** koyu gösterge paneli, kenar menüde canlı durum ışıkları, büyük sonuç paneli ve olasılık halkası, literatür aralığını gösteren kaydırıcılar, sekmeli analiz, kaydırınca beliren canlı sonuç çubuğu; açık tema seçeneği |
+| [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi:** koyu gösterge paneli, kenar menüde canlı durum ışıkları, olasılık halkası, sekmeli analiz |
+| [`tasarim-v3`](../../tree/tasarim-v3) | **v3 – Sakin (bu dal):** sıcak açık zemin, yumuşak yeşil vurgu; yöneticinin sorduğu sorulara göre düzenlenmiş sonuçlar, rehberli veri girişi |
+
+### v3 – Sakin tasarımın kullanıcıya dönük özellikleri
+
+- **Başlangıç sayfası:** nasıl kullanılacağını üç adımda anlatır; dört yatırımın güncel durumu kartlarda görünür.
+- **Kısa cevap:** sonuç önce tek cümleyle verilir ("Evet, yatırım kendini öder."). Ardından geri ödeme süresi, net kazanç ve güven düzeyi gelir.
+- **Soru-cevap düzeni:** sonuçlar yöneticinin sorduğu sorulara göre ayrılır. Her sorunun cevabı sade dille yazılır; grafik ve tablolar "ayrıntı" altında, istenirse açılır:
+  - Kendini ne zaman öder?
+  - Belediye bütçesine ne kazandırır?
+  - Bu sonuçtan ne kadar emin olabiliriz?
+  - Sonucu en çok ne değiştirir?
+  - Şehre ve çevreye etkisi ne?
+- **Anlaşılır belirsizlik:** olasılık yüzde yerine "10 senaryodan 9’unda kendini öder" biçiminde, on noktalık bir dizi ile gösterilir.
+- **Rehberli veri girişi:**
+  - Her alanın altında verinin hangi birimden ya da belgeden bulunacağı yazar.
+  - Henüz varsayılan değerde olan alanlar "Örnek" etiketi taşır; değer doğruysa tek tıkla onaylanır.
+  - "Belediye verisi: 3 / 15 alan" sayacı ilerlemeyi gösterir. Sonuç büyük ölçüde örnek değerlere dayanıyorsa kısa cevapta uyarı çıkar.
+- **Karşılaştırma:** "Hangi yatırım önce yapılmalı?" sorusuna sade cümlelerle sıralı bir cevap verir.
+- **Mobil:** kısa cevap kartı ekrandan çıkınca altta küçük bir özet çubuğu belirir.
 
 ### Yan yana
 
-| v1 – Klasik | v2 – Kontrol Merkezi |
-|---|---|
-| ![v1 aydınlatma](docs/ekran-goruntuleri/v1-masaustu-aydinlatma.png) | ![v2 aydınlatma](docs/ekran-goruntuleri/v2-masaustu-aydinlatma.png) |
-| ![v1 trafik](docs/ekran-goruntuleri/v1-masaustu-trafik.png) | ![v2 trafik](docs/ekran-goruntuleri/v2-masaustu-trafik.png) |
-| ![v1 karşılaştırma](docs/ekran-goruntuleri/v1-masaustu-karsilastirma.png) | ![v2 karşılaştırma](docs/ekran-goruntuleri/v2-masaustu-karsilastirma.png) |
-| <img src="docs/ekran-goruntuleri/v1-mobil-su.png" width="260" alt="v1 mobil"> | <img src="docs/ekran-goruntuleri/v2-mobil-su.png" width="260" alt="v2 mobil"> |
+| v1 – Klasik | v2 – Kontrol Merkezi | v3 – Sakin |
+|---|---|---|
+| ![v1 aydınlatma](docs/ekran-goruntuleri/v1-masaustu-aydinlatma.png) | ![v2 aydınlatma](docs/ekran-goruntuleri/v2-masaustu-aydinlatma.png) | ![v3 aydınlatma](docs/ekran-goruntuleri/v3-masaustu-aydinlatma.png) |
+| ![v1 trafik](docs/ekran-goruntuleri/v1-masaustu-trafik.png) | ![v2 trafik](docs/ekran-goruntuleri/v2-masaustu-trafik.png) | ![v3 trafik](docs/ekran-goruntuleri/v3-masaustu-trafik.png) |
+| ![v1 karşılaştırma](docs/ekran-goruntuleri/v1-masaustu-karsilastirma.png) | ![v2 karşılaştırma](docs/ekran-goruntuleri/v2-masaustu-karsilastirma.png) | ![v3 karşılaştırma](docs/ekran-goruntuleri/v3-masaustu-karsilastirma.png) |
+| <img src="docs/ekran-goruntuleri/v1-mobil-su.png" width="220" alt="v1 mobil"> | <img src="docs/ekran-goruntuleri/v2-mobil-su.png" width="220" alt="v2 mobil"> | <img src="docs/ekran-goruntuleri/v3-mobil-su.png" width="220" alt="v3 mobil"> |
 
-v2 açık tema:
+v3 başlangıç sayfası ve koyu tema:
 
-![v2 açık tema](docs/ekran-goruntuleri/v2-masaustu-su-acik-tema.png)
+![v3 başlangıç](docs/ekran-goruntuleri/v3-masaustu-baslangic.png)
+
+![v3 koyu tema](docs/ekran-goruntuleri/v3-masaustu-su-koyu-tema.png)
 
 ## Kapsanan yatırımlar
 
@@ -48,7 +69,7 @@ Formüller, varsayımların dayanakları, kaynakça ve sınırlamalar uygulamada
 
 ## Teknik yapı
 
-Sunucu tarafı kod, veritabanı veya derleme adımı yoktur; saf HTML/CSS/JavaScript (ES modülleri) ile yazılmış statik bir sitedir. Bu yüzden herhangi bir web barındırma hizmetinde çalışır. v2 tasarımı yazı tipleri (Inter, Space Grotesk) için Google Fonts kullanır; internet bağlantısı yoksa sistem yazı tipine düşer.
+Sunucu tarafı kod, veritabanı veya derleme adımı yoktur; saf HTML/CSS/JavaScript (ES modülleri) ile yazılmış statik bir sitedir. Bu yüzden herhangi bir web barındırma hizmetinde çalışır. v2 (Inter, Space Grotesk) ve v3 (Figtree, Fraunces) tasarımları yazı tipleri için Google Fonts kullanır; internet bağlantısı yoksa sistem yazı tipine düşer.
 
 ```
 index.html             Sayfa iskeleti ve Yöntem/Kaynaklar metni
@@ -58,6 +79,7 @@ assets/js/engine.js    NBD, İVO, geri ödeme, Monte Carlo, duyarlılık, başab
 assets/js/sources.js   Kaynakça
 assets/js/charts.js    Bağımlılıksız SVG grafikler
 assets/js/app.js       Arayüz
+assets/js/hints.js     "Bu veri nereden bulunur?" ipuçları (v3)
 tests/                 Hesap motoru testleri (node --test)
 ```
 

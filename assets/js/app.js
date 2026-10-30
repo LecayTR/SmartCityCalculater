@@ -1,48 +1,45 @@
-// Arayüz (v2 – Kontrol Merkezi): kenar menü, sonuç paneli, sekmeli analiz, karşılaştırma ve kayıt/yükleme.
-// Hesaplar engine.js ve models.js'te; bu dosya yalnızca sunumdan sorumludur.
+// Arayüz (v3 – Sakin): başlangıç sayfası, rehberli veri girişi, soru-cevap düzeninde sonuçlar,
+// sade dilli karşılaştırma ve kayıt/yükleme. Hesaplar engine.js ve models.js'tedir.
 
 import { MODELS, GLOBAL_INPUTS, defaultValues } from './models.js';
 import { evaluate, monteCarlo, tornado, breakEven, uncertainParams } from './engine.js';
-import { lineChart, hbarChart, histogram, gauge, installTooltips } from './charts.js';
+import { lineChart, hbarChart, histogram, installTooltips } from './charts.js';
 import { SOURCES } from './sources.js';
+import { HINTS, COST_HINT } from './hints.js';
 import * as F from './format.js';
 
 const STORAGE_KEY = 'akilli-sehir-analizi-v1';
-const THEME_KEY = 'akilli-sehir-tema';
-const BASIS_LABEL = { fin: 'Mali (belediye kasası)', eco: 'Toplumsal' };
-const KIND_LABEL = { cash: 'Belediye kasası', transfer: 'Belediye kasası (transfer)', social: 'Toplumsal' };
+const THEME_KEY = 'akilli-sehir-tema-v3';
+const KIND_LABEL = { cash: 'Belediye bütçesi', transfer: 'Belediye bütçesi (transfer)', social: 'Toplum' };
+const WHO = { fin: 'belediye bütçesi', eco: 'şehir geneli' };
 
 const GROUPS = [
-  { id: 'data', title: 'Mevcut durum', hint: 'Belediye kayıtları', sub: 'Belediyenin kendi kayıtlarından girilecek veriler.' },
-  { id: 'cost', title: 'Yatırım ve işletme maliyetleri', hint: 'Teklif ve keşif bedelleri', sub: 'Teklif, keşif bedeli veya benzer ihalelerden alınacak maliyetler.' },
-  { id: 'assumption', title: 'Etki varsayımları', hint: 'Literatüre dayalı', sub: 'Literatüre dayalı başlangıç değerleri. Kaydırıcıdaki yeşil bant literatür aralığını gösterir; belirsizlik analizi bu aralıkta çalışır. Pilot ölçümle güncelleyin.' },
-];
-
-const ANALYSIS_TABS = [
-  { id: 'akis', label: 'Nakit akışı' },
-  { id: 'belirsizlik', label: 'Belirsizlik' },
-  { id: 'duyarlilik', label: 'Duyarlılık' },
-  { id: 'dokum', label: 'Etki dökümü' },
-  { id: 'yorum', label: 'Özet yorum' },
+  { id: 'data', title: 'Mevcut durum', hint: 'Belediye kayıtlarınızdan', sub: 'Bugünkü durumu anlatan veriler. Her alanın altında verinin nereden bulunacağı yazar.' },
+  { id: 'cost', title: 'Yatırım ve işletme maliyetleri', hint: 'Teklif ve ihalelerden', sub: 'Yatırımın kuruluş ve yıllık işletme maliyetleri.' },
+  { id: 'assumption', title: 'Etki varsayımları', hint: 'Bilimsel kaynaklardan', sub: 'Yatırımın ne kadar tasarruf sağlayacağına dair kaynaklara dayalı başlangıç değerleri. Sarı bant kaynaklardaki aralığı gösterir. Pilot uygulamanız varsa ölçtüğünüz değeri girin.' },
 ];
 
 const P = {
+  home: 'M12 3 2 12h3v8h6v-6h2v6h6v-8h3z',
   compare: 'M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z',
   method: 'M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5zM8 12v2h8v-2zm0 4v2h8v-2z',
-  wallet: 'M3 7a3 3 0 0 1 3-3h12v3H6a1 1 0 0 0 0 2h15v11H6a3 3 0 0 1-3-3zm14 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z',
-  trend: 'M2.3 16.3 9 9.6l4 4 5.6-5.6H15V6h7v7h-2V9.4l-7 7-4-4-5.3 5.3z',
+  settings: 'M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.7a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z',
   clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5v5.4l4 2.3-1 1.7-5-2.9V7z',
-  users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM1 20c0-3.3 3.6-6 8-6s8 2.7 8 6v1H1zm16.5-5.9c2.9.4 5.5 2.2 5.5 4.9v1h-4.5v-1c0-1.9-.4-3.5-1-4.9z',
+  wallet: 'M3 7a3 3 0 0 1 3-3h12v3H6a1 1 0 0 0 0 2h15v11H6a3 3 0 0 1-3-3zm14 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z',
+  shield: 'M12 2 4 5v6c0 5 3.4 9.6 8 11 4.6-1.4 8-6 8-11V5zm-1.2 14.2-3.5-3.5 1.4-1.4 2.1 2.1 4.9-4.9 1.4 1.4z',
+  sliders: 'M3 17v2h6v-2zm0-12v2h10V5zm10 16v-2h8v-2h-8v-2h-2v6zM7 9v2H3v2h4v2h2V9zm14 4v-2H11v2zm-6-4h2V7h4V5h-4V3h-2z',
   leaf: 'M20 3C10 3 4 8 4 15c0 1.6.4 3 1 4.2L3.3 21l1.4 1.4 2-2C7.9 21.3 9.4 22 11 22c7 0 11-7 9-19zM8.5 17.5C10 14 13 11 16 9.5 13.5 12 11.5 14.5 10 18z',
-  spark: 'M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z',
-  info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2zm0-8h-2V7h2z',
+  pin: 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z',
+  bulb: 'M12 2a7 7 0 0 0-4 12.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3A7 7 0 0 0 12 2zm-3 18h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z',
+  alert: 'M12 2 1 21h22zm1 15h-2v-2h2zm0-4h-2V9h2z',
 };
 const STATUS_ICON = {
   good: '<svg viewBox="0 0 24 24"><path d="M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6L21.1 7.4 19.7 6z"/></svg>',
   warn: '<svg viewBox="0 0 24 24"><path d="M11 5h2v9h-2zm0 11h2v2h-2z"/></svg>',
   bad: '<svg viewBox="0 0 24 24"><path d="M18.3 5.7 16.9 4.3 12 9.2 7.1 4.3 5.7 5.7 10.6 12l-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z"/></svg>',
 };
-const SHORT_NAV = { aydinlatma: 'Işık', su: 'Su', atik: 'Atık', trafik: 'Trafik', karsilastirma: 'Kıyas', yontem: 'Yöntem' };
+const STATUS_COLOR = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)' };
+const NAV_SHORT = { aydinlatma: 'Aydınlatma', su: 'Su', atik: 'Atık', trafik: 'Trafik' };
 
 // ---------- Durum ----------
 
@@ -54,7 +51,8 @@ function freshState() {
     values: Object.fromEntries(MODELS.map(m => [m.id, defaultValues(m.inputs)])),
     include: Object.fromEntries(MODELS.map(m => [m.id, true])),
     basis: Object.fromEntries(MODELS.map(m => [m.id, m.primary])),
-    tab: Object.fromEntries(MODELS.map(m => [m.id, 'akis'])),
+    // Kullanıcının kendi verisiyle doldurduğu veya "doğru" diye onayladığı alanlar
+    confirmed: Object.fromEntries(MODELS.map(m => [m.id, []])),
   };
 }
 
@@ -71,7 +69,8 @@ function merge(base, saved) {
     pick(base.values[m.id], saved.values?.[m.id], m.inputs);
     if (typeof saved.include?.[m.id] === 'boolean') base.include[m.id] = saved.include[m.id];
     if (saved.basis?.[m.id] === 'fin' || saved.basis?.[m.id] === 'eco') base.basis[m.id] = saved.basis[m.id];
-    if (ANALYSIS_TABS.some(t => t.id === saved.tab?.[m.id])) base.tab[m.id] = saved.tab[m.id];
+    const keys = new Set(m.inputs.map(i => i.key));
+    if (Array.isArray(saved.confirmed?.[m.id])) base.confirmed[m.id] = saved.confirmed[m.id].filter(k => keys.has(k));
   }
   return base;
 }
@@ -93,12 +92,16 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const esc = F.escapeHtml;
 const modelById = id => MODELS.find(m => m.id === id);
 const svg = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
-const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 
 function debounce(fn, ms) {
   let t;
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
+
+// "10 senaryodan 7'sinde" gibi ifadeler için Türkçe ek.
+const LOC = ['hiçbirinde', '1’inde', '2’sinde', '3’ünde', '4’ünde', '5’inde', '6’sında', '7’sinde', '8’inde', '9’unda', '10’unda'];
+const outOfTen = p => Math.max(0, Math.min(10, Math.round(p * 10)));
 
 function rangeText(i) {
   const [a, b] = i.unc;
@@ -111,31 +114,17 @@ function paramValueText(p, x) {
   return `${F.num(x, 2)} ${p.unit}`;
 }
 
-function paybackInfo(res, basis = 'fin') {
-  const s = res[basis];
-  if (s.payback != null) return { value: F.years(s.payback), years: s.payback, sub: s.dpayback != null ? `İskontolu: ${F.years(s.dpayback)}` : 'İskontolu: ömür içinde ödemiyor' };
-  const annual = basis === 'fin' ? res.year1.cashNet : res.year1.ecoNet;
-  const inv = basis === 'fin' ? res.netInvestment : res.investment;
-  if (annual > 0) return { value: 'Ömür içinde ödemiyor', years: inv / annual, sub: `≈ ${F.years(inv / annual)} gerekir (ömür ${res.life} yıl)` };
-  return { value: 'Geri ödemiyor', years: null, sub: 'Yıllık net etki sıfır veya negatif' };
-}
-
 const fmtTL = { axis: F.axisTL, value: F.tlShort };
 
-// Sayının eski değerinden yenisine yumuşak geçişle yazılması.
-const shown = new Map();
-function countUp(el, key, to, format) {
-  const from = shown.get(key);
-  shown.set(key, to);
-  if (from == null || from === to || reduceMotion()) { el.textContent = format(to); return; }
-  const start = performance.now(), dur = 650;
-  const step = now => {
-    const k = Math.min(1, (now - start) / dur);
-    const e = 1 - Math.pow(1 - k, 3);
-    el.textContent = format(from + (to - from) * e);
-    if (k < 1 && shown.get(key) === to) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+// Belediyenin kendi verisiyle doldurması beklenen alanlar (hibe isteğe bağlıdır).
+const ownDataInputs = model => model.inputs.filter(i => (i.group === 'data' || i.group === 'cost') && i.key !== 'grant');
+const isFilled = (model, key) => state.confirmed[model.id].includes(key) || state.values[model.id][key] !== model.inputs.find(i => i.key === key).value;
+function completeness(model) {
+  const list = ownDataInputs(model);
+  return { done: list.filter(i => isFilled(model, i.key)).length, total: list.length };
+}
+function confirm(model, key) {
+  if (!state.confirmed[model.id].includes(key)) state.confirmed[model.id].push(key);
 }
 
 // ---------- Analiz (girdi değişmedikçe önbellekten) ----------
@@ -151,102 +140,110 @@ function analyse(model) {
   return result;
 }
 
+// Sade dilli karar: kısa cevap başlığı ve açıklaması.
 function verdict(model, res, mc) {
   const f = res.fin.npv, e = res.eco.npv;
-  const pf = F.pct(mc.fin.pPositive * 100, 0), pe = F.pct(mc.eco.pPositive * 100, 0);
   if (f > 0 && mc.fin.pPositive >= 0.8) {
     return {
-      level: 'good', label: 'Mali açıdan güçlü',
-      title: 'Yatırım kendini amorti ediyor',
-      text: `Mevcut varsayımlarla yatırım ${F.years(res.fin.payback)} içinde kendini geri ödüyor ve ${res.life} yıllık ömrü boyunca belediye bütçesine bugünkü değerle ${F.tlShort(f)} net katkı sağlıyor. Belirsizlik analizinde olumlu sonuç olasılığı ${pf}.`,
+      level: 'good', label: 'Kendini öder',
+      title: 'Evet, yatırım kendini öder.',
+      text: `Yaklaşık ${F.years(res.fin.payback)} içinde ilk maliyetini karşılar; ${res.life} yıllık ömrü boyunca belediye bütçesine bugünkü değerle ${F.tlShort(f)} net kazanç sağlar.`,
     };
   }
   if (f > 0) {
     return {
-      level: 'warn', label: 'Olumlu ama belirsiz',
-      title: 'Kârlı görünüyor, ancak varsayımlara duyarlı',
-      text: `Beklenen değerlerle mali net bugünkü değer ${F.tlShort(f)}; fakat belirsizlik analizinde olumlu sonuç olasılığı ${pf}. Karardan önce sonucu en çok etkileyen varsayımın pilot uygulamayla doğrulanması önerilir.`,
+      level: 'warn', label: 'Öder ama belirsiz',
+      title: 'Muhtemelen öder, ama sonuç varsayımlara duyarlı.',
+      text: `Beklenen değerlerle ${F.years(res.fin.payback)} içinde kendini öder ve bugünkü değerle ${F.tlShort(f)} kazandırır. Ancak varsayımlar değiştiğinde 10 senaryodan yalnızca ${LOC[outOfTen(mc.fin.pPositive)]} kendini öder; karardan önce küçük bir pilot uygulama önerilir.`,
     };
   }
   if (e > 0) {
     return {
-      level: mc.eco.pPositive >= 0.8 ? 'good' : 'warn', label: 'Toplumsal fayda odaklı',
-      title: 'Belediye kasasına geri dönmüyor, şehre değer katıyor',
-      text: `Yatırım belediye bütçesi açısından kendini amorti etmiyor (mali NBD ${F.tlShort(f)}), ancak vatandaşa ve kamuya sağladığı faydalarla toplumsal net bugünkü değeri ${F.tlShort(e)}${res.eco.bcr ? `, fayda/maliyet oranı ${F.num(res.eco.bcr, 2)}` : ''}. Toplumsal açıdan olumlu sonuç olasılığı ${pe}. Gerekçe kamu yararı olmalı; hibe veya dış finansman belediyenin yükünü azaltabilir.`,
+      level: mc.eco.pPositive >= 0.8 ? 'good' : 'warn', label: 'Şehre değer katar',
+      title: 'Belediye kasasına geri dönmez, ama şehre değer katar.',
+      text: `Belediye bütçesi açısından ömrü içinde kendini ödemez. Vatandaşa ve kamuya sağladığı faydalarla şehre bugünkü değerle ${F.tlShort(e)} net değer kazandırır${res.eco.bcr ? ` (her 1 TL maliyete ${F.num(res.eco.bcr, 2)} TL fayda)` : ''}. Hibe veya dış finansman belediyenin yükünü azaltabilir.`,
     };
   }
   return {
-    level: 'bad', label: 'Ekonomik değil',
-    title: 'Mevcut varsayımlarla yatırım kendini karşılamıyor',
-    text: `Hem mali (${F.tlShort(f)}) hem toplumsal (${F.tlShort(e)}) net bugünkü değer negatif. Maliyetlerin düşürülmesi, kapsamın daraltılması veya hibe ile yeniden değerlendirilmesi önerilir.`,
+    level: 'bad', label: 'Kendini ödemez',
+    title: 'Mevcut verilerle yatırım kendini ödemez.',
+    text: `Hem belediye bütçesi (${F.tlShort(f)}) hem şehir geneli (${F.tlShort(e)}) için net değer negatif. Maliyeti düşürmek, kapsamı daraltmak veya hibe bulmak sonucu değiştirebilir; “Sonucu en çok ne değiştirir?” bölümüne bakın.`,
   };
 }
 
-// Başabaş cümleleri: maliyet toleransı ve en etkili varsayımın eşik değeri.
-function breakEvenNotes(model, basis, tor) {
+function statusChip(vd) {
+  return `<span class="status-chip ${vd.level}"><span class="ic">${STATUS_ICON[vd.level]}</span>${vd.label}</span>`;
+}
+
+// Kısa bir "ne zaman öder" ifadesi (başlangıç kartları ve mobil çubuk için).
+function shortAnswer(model, res) {
+  if (model.primary === 'eco' && res.fin.npv <= 0) return `Şehre ${F.tlShort(res.eco.npv)} net değer`;
+  if (res.fin.payback != null) return `${F.years(res.fin.payback)} içinde kendini öder`;
+  return 'Ömrü içinde kendini ödemez';
+}
+
+// Başabaş ve en etkili varsayımlara dair sade cümleler.
+function driverNotes(model, basis, tor) {
   const v = state.values[model.id], g = state.globals;
   const notes = [];
   const cost = uncertainParams(model).find(p => p.scope === 'cost');
-  if (tor.base > 0) {
-    const x = breakEven(model, v, g, cost, basis, 1, 20);
-    notes.push(x != null
-      ? `Yatırım maliyeti <b>%${F.num((x - 1) * 100, 0)}</b> daha yüksek gerçekleşse bile net bugünkü değer sıfırın üzerinde kalır.`
-      : 'Yatırım maliyeti 20 katına çıksa bile net bugünkü değer pozitif kalır.');
-  } else {
-    const x = breakEven(model, v, g, cost, basis, 0.001, 1);
-    notes.push(x != null
-      ? `Net bugünkü değerin sıfıra ulaşması için yatırım maliyetinin <b>%${F.num((1 - x) * 100, 0)}</b> düşmesi gerekir.`
-      : 'Yatırım maliyeti sıfıra inse bile yıllık net etki negatif olduğu için yatırım kendini karşılamaz.');
-  }
   const top = tor.rows.find(r => r.param.scope === 'model' && r.swing > 0);
   if (top) {
     const p = top.param;
     const increasing = top.hiNpv > top.loNpv;
     const x = breakEven(model, v, g, p, basis, p.min ?? 0, p.max ?? Math.max(p.unc[1], v[p.key]) * 10);
     notes.push(x != null
-      ? `Sonucu en çok etkileyen varsayım <b>${esc(p.label.toLowerCase())}</b>. Yatırımın kendini karşılaması için bu değerin ${increasing ? 'en az' : 'en fazla'} <b>${paramValueText(p, x)}</b> olması gerekir (girilen: ${paramValueText(p, v[p.key])}).`
-      : `Sonucu en çok etkileyen varsayım <b>${esc(p.label.toLowerCase())}</b>; bu varsayımın makul her değerinde sonucun işareti değişmiyor.`);
+      ? `En belirleyici varsayım <b>${esc(p.label.toLowerCase())}</b>. Yatırımın kendini ödemesi için bu değerin ${increasing ? 'en az' : 'en fazla'} <b>${paramValueText(p, x)}</b> olması gerekir; şu an ${paramValueText(p, v[p.key])} girili.`
+      : `En belirleyici varsayım <b>${esc(p.label.toLowerCase())}</b>; ancak bu varsayımın makul her değerinde sonuç aynı yönde kalıyor.`);
   }
+  if (tor.base > 0) {
+    const x = breakEven(model, v, g, cost, basis, 1, 20);
+    notes.push(x != null
+      ? `Yatırım maliyeti öngörülenden <b>%${F.num((x - 1) * 100, 0)}</b> fazla çıksa bile yatırım kendini öder.`
+      : 'Yatırım maliyeti birkaç katına çıksa bile yatırım kendini öder.');
+  } else {
+    const x = breakEven(model, v, g, cost, basis, 0.001, 1);
+    notes.push(x != null
+      ? `Kendini ödemesi için yatırım maliyetinin <b>%${F.num((1 - x) * 100, 0)}</b> düşmesi gerekir.`
+      : 'Yıllık net etki negatif olduğu için maliyet düşse bile yatırım kendini ödemez.');
+  }
+  const names = tor.rows.slice(0, 3).map(r => r.param.label.toLowerCase());
+  notes.push(`Sonucu en çok etkileyen üç etken: ${names.map(esc).join(', ')}. Bunları küçük bir pilot uygulamayla ölçmek, kararın güvenilirliğini en çok artıracak adımdır.`);
   return notes;
 }
 
 // ---------- Gezinme ----------
 
 let currentPage = null;
+let answerObserver = null;
 
 function renderNav() {
-  const items = MODELS.map(m => {
+  const link = (id, label, path, extra = '') => `<a class="nav-link" href="#${id}" ${id === currentPage ? 'aria-current="page"' : ''}>${path ? svg(path) : ''}${label}${extra}</a>`;
+  const models = MODELS.map(m => {
     const { res, mc } = analyse(m);
     const vd = verdict(m, res, mc);
-    return `<a class="nav-item" href="#${m.id}" ${m.id === currentPage ? 'aria-current="page"' : ''} title="${esc(vd.label)}">
-      <span class="nav-icon">${svg(m.icon)}</span>
-      <span class="nav-text"><b>${m.name}</b><small>${m.primary === 'fin' ? 'Mali' : 'Toplumsal'} NBD ${F.tlShort(res[m.primary].npv)}</small></span>
-      <span class="status-dot ${vd.level}" role="img" aria-label="${esc(vd.label)}"></span>
-    </a>`;
+    return link(m.id, NAV_SHORT[m.id], m.icon, ` <span class="dot" style="background:${STATUS_COLOR[vd.level]}" title="${esc(vd.label)}"></span>`);
   }).join('');
-  const link = (id, label, path) => `<a class="nav-item" href="#${id}" ${id === currentPage ? 'aria-current="page"' : ''}><span class="nav-icon">${svg(path)}</span><span class="nav-text"><b>${label}</b></span><span></span></a>`;
-  $('#side-nav').innerHTML = `<div class="group-label">Yatırımlar</div>${items}<div class="group-label">Analiz</div>${link('karsilastirma', 'Karşılaştırma', P.compare)}${link('yontem', 'Yöntem ve Kaynaklar', P.method)}`;
-
-  const bottom = [...MODELS.map(m => [m.id, m.icon]), ['karsilastirma', P.compare], ['yontem', P.method]];
-  $('#bottom-nav').innerHTML = bottom.map(([id, path]) => `<a href="#${id}" ${id === currentPage ? 'aria-current="page"' : ''}>${svg(path)}${SHORT_NAV[id]}</a>`).join('');
-
-  const muni = $('[data-bind="municipality"]');
-  muni.hidden = !state.municipality;
-  muni.textContent = state.municipality;
-  $('[data-bind="municipality-short"]').textContent = state.municipality || 'Yatırım Analizi';
+  $('#main-nav').innerHTML = link('baslangic', 'Başlangıç', P.home) + '<span class="nav-sep" aria-hidden="true"></span>' + models +
+    '<span class="nav-sep" aria-hidden="true"></span>' + link('karsilastirma', 'Karşılaştır', P.compare) + link('yontem', 'Yöntem', P.method);
+  $('[data-bind="municipality"]').textContent = state.municipality || 'Yatırım Rehberi';
+  // Dar ekranda etkin sekme görünür alana kaydırılır.
+  const nav = $('#main-nav'), active = nav.querySelector('[aria-current="page"]');
+  if (active && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.clientWidth) / 2;
 }
 
 function route() {
   const [page, anchor] = decodeURIComponent(location.hash.slice(1)).split('/');
-  const id = page || MODELS[0].id;
-  const target = modelById(id) || id === 'karsilastirma' || id === 'yontem' ? id : MODELS[0].id;
+  const id = page || 'baslangic';
+  const target = modelById(id) || ['baslangic', 'karsilastirma', 'yontem'].includes(id) ? id : 'baslangic';
   const changed = target !== currentPage;
   currentPage = target;
-  $('#live-bar').classList.remove('show');
-  heroObserver?.disconnect();
+  answerObserver?.disconnect();
+  $('#answer-dock').hidden = true;
   if (modelById(target)) renderModelPage(modelById(target));
   else if (target === 'karsilastirma') renderCompare();
-  else renderMethod(anchor);
+  else if (target === 'yontem') renderMethod(anchor);
+  else renderStart();
   renderNav();
   if (changed && !anchor) window.scrollTo(0, 0);
 }
@@ -254,7 +251,46 @@ function route() {
 function printMeta() {
   const date = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
   const parts = [state.municipality || 'Belediye adı girilmedi', state.preparer, date].filter(Boolean);
-  return `<div class="print-only panel panel-pad" style="margin-bottom:12px"><strong>Akıllı Şehir Yatırım Analizi – Ön Fizibilite Raporu</strong><br>${parts.map(esc).join(' · ')}</div>`;
+  return `<div class="print-only card pad" style="margin-bottom:14px"><strong>Akıllı Şehir Yatırım Rehberi – Ön Fizibilite Raporu</strong><br>${parts.map(esc).join(' · ')}</div>`;
+}
+
+// ---------- Başlangıç ----------
+
+function renderStart() {
+  const cards = MODELS.map(m => {
+    const { res, mc } = analyse(m);
+    const vd = verdict(m, res, mc);
+    const c = completeness(m);
+    return `<a class="choice card" href="#${m.id}">
+      <div class="choice-head"><span class="choice-icon">${svg(m.icon)}</span><h3>${m.name}</h3></div>
+      <p>${m.summary}</p>
+      <div>${statusChip(vd)}</div>
+      <div class="choice-answer">${shortAnswer(m, res)}</div>
+      <div class="choice-foot"><span>Belediye verisi: <b>${c.done} / ${c.total}</b> alan</span><span class="go">${c.done ? 'Devam et' : 'Hesapla'} →</span></div>
+    </a>`;
+  }).join('');
+
+  $('#view').innerHTML = `
+    <section class="welcome card">
+      <div>
+        <p class="kicker">Belediyeler için ön fizibilite aracı</p>
+        <h1>Akıllı şehir yatırımınız kendini öder mi?</h1>
+        <p class="lead">Belediyenizin verilerini girin; araç yatırımın ne zaman kendini ödeyeceğini, bütçeye ve şehre ne kazandıracağını ve bu sonuçtan ne kadar emin olabileceğinizi sade bir dille göstersin.</p>
+      </div>
+      <ol class="how">
+        <li><div><b>Yatırımı seçin</b><span>Aşağıdaki dört akıllı şehir yatırımından birini açın.</span></div></li>
+        <li><div><b>Kendi verilerinizi girin</b><span>“Örnek” etiketli alanları kayıtlarınızla değiştirin. Her alanda verinin nereden bulunacağı yazar.</span></div></li>
+        <li><div><b>Cevabı okuyun, rapor alın</b><span>Sonuç, yöneticilerin sorduğu sorulara göre özetlenir. “Rapor al” ile PDF olarak saklayabilirsiniz.</span></div></li>
+      </ol>
+    </section>
+    <h2 class="section-title">Yatırımlar</h2>
+    <p class="section-sub">Kartlardaki sonuçlar şu an girili değerlere göredir; örnek değerlerle başlar.</p>
+    <div class="choice-grid">${cards}</div>
+    <div class="quick">
+      <a class="card" href="#karsilastirma">${svg(P.compare)}<div><b>Yatırımları karşılaştırın</b><span>Bütçe kısıtlıysa hangi yatırımın önce yapılacağını görün.</span></div></a>
+      <a class="card" href="#" data-action="settings">${svg(P.settings)}<div><b>Genel ayarlar</b><span>Belediye adı, iskonto oranı, fiyat artışı ve karbon değeri.</span></div></a>
+      <a class="card" href="#yontem">${svg(P.method)}<div><b>Yöntem ve kaynaklar</b><span>Hesaplamaların nasıl yapıldığı ve dayandığı kaynaklar.</span></div></a>
+    </div>`;
 }
 
 // ---------- Form ----------
@@ -267,21 +303,27 @@ function rangeVars(i, x) {
   return vars.join(';');
 }
 
-function fieldHtml(i, value, prefix) {
+function fieldHtml(i, value, prefix, model) {
   const id = `f-${prefix}-${i.key}`;
-  const changed = value !== i.value;
+  const tracked = model && ownDataInputs(model).includes(i);
+  const example = tracked && !isFilled(model, i.key);
+  const where = model && (i.group === 'data' || i.group === 'cost') ? (HINTS[model.id]?.[i.key] || (i.group === 'cost' && i.key !== 'grant' ? COST_HINT : null)) : null;
   const srcs = (i.src || []).map(s => `<a class="chip" href="#yontem/${s}" title="${esc(SOURCES[s].short)}">${s}</a>`).join('');
-  const meta = (i.unc ? `<span class="band-key">Literatür aralığı: ${rangeText(i)}</span>` : '') + srcs;
+  const meta = (i.unc ? `<span class="band-key">Kaynaklardaki aralık: ${rangeText(i)}</span>` : '') + srcs;
   const box = `<div class="input-wrap"><input id="${id}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${F.inputNum(value)}" data-key="${i.key}"><span class="unit">${esc(i.unit)}</span></div>`;
   const control = i.pct
     ? `<div class="slider-row"><input type="range" min="${i.min ?? 0}" max="${i.max ?? 100}" step="${i.step ?? 1}" value="${value}" data-key="${i.key}" style="${rangeVars(i, value)}" aria-label="${esc(i.label)}">${box}</div>`
     : box;
-  return `<div class="field${changed ? ' changed' : ''}" data-key="${i.key}">
+  return `<div class="field${example ? ' is-example' : ''}" data-key="${i.key}">
     <div class="field-top">
       <label for="${id}">${esc(i.label)}</label>
-      ${i.help ? `<button type="button" class="info-btn" aria-expanded="false" aria-controls="${id}-help" aria-label="Açıklamayı göster">?</button>` : ''}
+      <span class="field-tags">
+        ${tracked ? `<span class="tag-example">Örnek<button type="button" data-confirm="${i.key}" title="Bu değer belediyemiz için doğru">Doğru</button></span>` : ''}
+        ${i.help ? `<button type="button" class="info-btn" aria-expanded="false" aria-controls="${id}-help" aria-label="Açıklamayı göster">?</button>` : ''}
+      </span>
     </div>
     ${control}
+    ${where ? `<p class="where">${svg(P.pin)}<span>${esc(where)}</span></p>` : ''}
     ${i.help ? `<div class="help" id="${id}-help" hidden>${esc(i.help)}</div>` : ''}
     ${meta ? `<div class="meta">${meta}</div>` : ''}
     <div class="error" hidden></div>
@@ -311,7 +353,6 @@ function bindFields(root, inputs, target, onChange) {
     box.textContent = err || '';
     if (err) return;
     target[i.key] = x;
-    field.classList.toggle('changed', x !== i.value);
     const range = field.querySelector('input[type="range"]');
     if (range) {
       range.setAttribute('style', rangeVars(i, x));
@@ -319,7 +360,7 @@ function bindFields(root, inputs, target, onChange) {
       else range.value = x;
     }
     save();
-    onChange();
+    onChange(i.key, field);
   });
   root.addEventListener('focusout', e => {
     const el = e.target.closest('input[type="text"][data-key]');
@@ -337,235 +378,231 @@ function bindFields(root, inputs, target, onChange) {
 
 // ---------- Yatırım sayfası ----------
 
-let heroObserver = null;
-let current = null; // son hesaplanan analiz; sekme değişince grafikleri yeniden çizmek için
+const openDetails = new Set(); // yeniden çizimde açık kalması gereken ayrıntı bölümleri
+let current = null;
 
 function renderModelPage(model) {
   const v = state.values[model.id];
-  const steps = GROUPS.map((gr, k) => {
-    const fields = model.inputs.filter(i => i.group === gr.id).map(i => fieldHtml(i, v[i.key], model.id)).join('');
-    return `<details class="step" ${k === 0 || window.innerWidth > 1100 ? 'open' : ''}>
-      <summary><span class="step-no">${k + 1}</span><span class="step-title"><b>${gr.title}</b><small>${gr.hint}</small></span><span class="chev" aria-hidden="true">›</span></summary>
-      <div class="step-body"><p class="sub">${gr.sub}</p>${fields}</div>
+  const groups = GROUPS.map((gr, k) => {
+    const fields = model.inputs.filter(i => i.group === gr.id).map(i => fieldHtml(i, v[i.key], model.id, model)).join('');
+    return `<details class="group card" ${k < 2 || window.innerWidth > 1080 ? 'open' : ''}>
+      <summary><span class="group-no">${k + 1}</span><span class="group-title"><b>${gr.title}</b><small>${gr.hint}</small></span><span class="chev" aria-hidden="true">›</span></summary>
+      <div class="group-body"><p class="sub">${gr.sub}</p>${fields}</div>
     </details>`;
   }).join('');
 
-  const tabs = ANALYSIS_TABS.map(t => `<button type="button" class="atab" role="tab" id="tab-${t.id}" aria-controls="panel-${t.id}" data-tab="${t.id}">${t.label}</button>`).join('');
-
   $('#view').innerHTML = `
     ${printMeta()}
-    <section class="hero panel" id="hero">
-      <div>
-        <div class="hero-tag">${svg(model.icon)}${model.name}</div>
-        <h1 data-ref="title"></h1>
-        <p data-ref="text"></p>
-        <div class="pill" data-ref="pill"></div>
-      </div>
-      <div class="hero-figures">
-        <div class="big-figure">
-          <div class="eyebrow">${model.primary === 'fin' ? 'Mali' : 'Toplumsal'} net bugünkü değer</div>
-          <div class="value" data-ref="npv"></div>
-          <div class="caption" data-ref="caption"></div>
-        </div>
-        <div class="gauge-box">
-          <div data-ref="gauge"></div>
-          <div class="gauge-center"><div><b data-ref="prob"></b><small>olumlu sonuç<br>olasılığı</small></div></div>
-        </div>
-      </div>
-    </section>
-    <section class="kpis reveal" id="kpis"></section>
-    <div class="notice no-print">${svg(P.info)}<span>${model.summary} Varsayılan değerler <strong>örnektir</strong>; kendi verilerinizi girdikçe tüm sonuçlar anında güncellenir. İskonto oranı, fiyat artışı ve karbon değeri <a href="#" data-action="settings">genel ayarlardadır</a>.</span></div>
-    <div class="workspace">
-      <form class="inputs panel" id="model-form" autocomplete="off" onsubmit="return false">
-        <div class="inputs-head"><h2>Veri girişi</h2><small id="edited-count"></small></div>
-        <h2 class="print-only" style="padding:0 12px">Ek: Hesaplamada kullanılan girdiler</h2>
-        ${steps}
-        <div class="reset-row no-print"><button type="button" class="btn" id="btn-reset-model">Varsayılan değerlere dön</button></div>
+    <div class="page-title">
+      <a class="back no-print" href="#baslangic">← Tüm yatırımlar</a>
+      <div class="title-row"><span class="title-icon">${svg(model.icon)}</span><div><h1>${model.name}</h1><p>${model.summary}</p></div></div>
+    </div>
+    <div class="layout">
+      <form class="data-col" id="model-form" autocomplete="off" onsubmit="return false" aria-label="Veri girişi">
+        <section class="data-head card">
+          <h2>Verileriniz</h2>
+          <div class="meter"><div class="meter-bar"><i id="meter-fill"></i></div><div class="meter-text"><span>Belediye verisi</span><span id="meter-label"></span></div></div>
+          <p class="hint">“Örnek” etiketli alanlar henüz varsayılan değerde. Kendi kaydınızla değiştirin ya da değer doğruysa “Doğru”ya basın.</p>
+        </section>
+        ${groups}
+        <div class="reset-row no-print"><button type="button" class="btn quiet" id="btn-reset-model">Bu yatırımın verilerini sıfırla</button></div>
       </form>
-      <section class="analysis panel" id="analysis">
-        <div class="atabs" role="tablist" aria-label="Analiz görünümleri">${tabs}</div>
-        <div id="apanels"></div>
-      </section>
+      <div class="result-col" id="results" aria-live="polite"></div>
     </div>`;
 
-  bindFields($('#model-form'), model.inputs, v, debounce(() => { renderResults(model); renderNav(); }, 100));
+  const form = $('#model-form');
+  const refresh = debounce(() => { renderResults(model); renderNav(); }, 120);
+  bindFields(form, model.inputs, v, (key, field) => {
+    if (ownDataInputs(model).some(i => i.key === key)) { confirm(model, key); field.classList.remove('is-example'); save(); }
+    updateMeter(model);
+    refresh();
+  });
+  form.addEventListener('click', e => {
+    const b = e.target.closest('[data-confirm]');
+    if (!b) return;
+    confirm(model, b.dataset.confirm);
+    save();
+    b.closest('.field').classList.remove('is-example');
+    updateMeter(model);
+    renderResults(model);
+    renderNav();
+  });
   $('#btn-reset-model').addEventListener('click', () => {
-    if (!confirm(`${model.name} girdileri varsayılan değerlere döndürülsün mü?`)) return;
+    if (!window.confirm(`${model.name} için girdiğiniz tüm veriler örnek değerlere döndürülsün mü?`)) return;
     state.values[model.id] = defaultValues(model.inputs);
+    state.confirmed[model.id] = [];
     save();
     renderModelPage(model);
     renderNav();
   });
-  $('#analysis .atabs').addEventListener('click', e => {
-    const b = e.target.closest('[data-tab]');
-    if (!b) return;
-    state.tab[model.id] = b.dataset.tab;
-    save();
-    showTab(model, true);
-  });
 
-  heroObserver = new IntersectionObserver(([entry]) => {
-    $('#live-bar').classList.toggle('show', !entry.isIntersecting && entry.boundingClientRect.top < 0);
-  });
-  heroObserver.observe($('#hero'));
-
+  updateMeter(model);
   renderResults(model);
-  setTimeout(() => $('#kpis')?.classList.remove('reveal'), 700);
 }
 
-function kpi(iconPath, label, value, caption, opts = {}) {
-  return `<div class="kpi panel"><div class="kpi-head"><span class="kpi-icon">${svg(iconPath)}</span>${label}</div>
-    <div class="value${opts.neg ? ' neg' : ''}">${value}</div>${opts.extra || ''}<div class="caption">${caption}</div></div>`;
+function updateMeter(model) {
+  const c = completeness(model);
+  $('#meter-fill').style.width = `${c.done / c.total * 100}%`;
+  $('#meter-label').innerHTML = `<b>${c.done} / ${c.total}</b> alan`;
 }
 
 function renderResults(model) {
-  if (!$('#hero')) return;
+  const box = $('#results');
+  if (!box) return;
   const { res, mc } = analyse(model);
   const basis = state.basis[model.id];
   const tor = tornado(model, state.values[model.id], state.globals, basis);
   const vd = verdict(model, res, mc);
-  const primary = model.primary;
-  const pb = paybackInfo(res, primary);
+  const p = model.primary;
+  const c = completeness(model);
   current = { model, res, mc, tor, basis };
 
-  // Hero yerinde güncellenir ki sayı ve gösterge yumuşak geçsin.
-  const hero = $('#hero');
-  hero.querySelector('[data-ref="title"]').textContent = vd.title;
-  hero.querySelector('[data-ref="text"]').textContent = vd.text;
-  const pill = hero.querySelector('[data-ref="pill"]');
-  pill.className = `pill ${vd.level}`;
-  pill.innerHTML = `<span class="pill-icon">${STATUS_ICON[vd.level]}</span>${vd.label}`;
-  const npvEl = hero.querySelector('[data-ref="npv"]');
-  npvEl.classList.toggle('neg', res[primary].npv < 0);
-  countUp(npvEl, `${model.id}-npv`, res[primary].npv, F.tlShort);
-  hero.querySelector('[data-ref="caption"]').textContent = `${res.life} yıllık ömür boyunca, bugünkü değerle · İVO ${res[primary].irr != null ? F.pct(res[primary].irr * 100) : '—'}`;
-  const prob = mc[primary].pPositive;
-  const gaugeBox = hero.querySelector('[data-ref="gauge"]');
-  const arc = gaugeBox.querySelector('.gauge-arc');
-  if (arc) {
-    const c = 2 * Math.PI * Number(arc.getAttribute('r'));
-    arc.style.transition = 'stroke-dasharray .7s cubic-bezier(.2,.8,.2,1)';
-    arc.setAttribute('stroke-dasharray', `${(c * prob).toFixed(2)} ${c.toFixed(2)}`);
-  } else {
-    gaugeBox.innerHTML = gauge({ value: prob, label: 'Olumlu sonuç olasılığı' });
-  }
-  countUp(hero.querySelector('[data-ref="prob"]'), `${model.id}-prob`, prob * 100, x => F.pct(x, 0));
+  const k = outOfTen(mc[p].pPositive);
+  const facts = p === 'fin'
+    ? [
+      ['Geri ödeme süresi', res.fin.payback != null ? F.years(res.fin.payback) : 'Ömür içinde yok', `Ekonomik ömür ${res.life} yıl`],
+      ['Net kazanç (bugünkü değerle)', F.tlShort(res.fin.npv), 'Belediye bütçesi için'],
+      ['Güven', `10 senaryodan ${k}`, 'Kendini ödediği senaryo sayısı'],
+    ]
+    : [
+      ['Şehre net değer', F.tlShort(res.eco.npv), 'Bugünkü değerle, ömür boyunca'],
+      ['Her 1 TL’ye fayda', res.eco.bcr != null ? `${F.num(res.eco.bcr, 2)} TL` : '—', 'Fayda / maliyet oranı'],
+      ['Güven', `10 senaryodan ${k}`, 'Olumlu sonuç veren senaryo sayısı'],
+    ];
+  const factHtml = facts.map(([l, v, s]) => `<div class="fact"><small>${l}</small><b class="${String(v).startsWith('-') ? 'neg-text' : ''}">${v}</b><span>${s}</span></div>`).join('');
+  const caution = c.done / c.total < 0.5
+    ? `<p class="caution">${svg(P.alert)}<span>Sonuç şu an büyük ölçüde örnek değerlere dayanıyor (belediye verisi: ${c.done} / ${c.total} alan). Kendi verilerinizi girdikçe sonuç netleşir.</span></p>`
+    : '';
 
-  // Göstergeler; geri ödeme kartında süre / ömür çizgisi
-  const within = pb.years != null && res[primary].payback != null;
-  const timeline = `<div class="timeline" title="Geri ödeme süresi / ekonomik ömür">${within ? `<div class="fill" style="width:${Math.min(1, pb.years / res.life) * 100}%"></div>` : '<div class="over"></div>'}</div>
-    <div class="timeline-legend"><span>0</span><span>ömür ${res.life} yıl</span></div>`;
-  const other = primary === 'fin' ? 'eco' : 'fin';
-  $('#kpis').innerHTML = [
-    kpi(P.wallet, 'Toplam yatırım', F.tlShort(res.investment), res.grant > 0 ? `Hibe sonrası belediye payı ${F.tlShort(res.netInvestment)}` : `${res.life} yıllık ekonomik ömür`),
-    kpi(P.trend, 'Yıllık net nakit (1. yıl)', F.tlShort(res.year1.cashNet), `Tasarruf ${F.tlShort(res.year1.cashIn)} · gider ${F.tlShort(res.year1.cashOut)}`, { neg: res.year1.cashNet < 0 }),
-    kpi(P.clock, `Geri ödeme${primary === 'eco' ? ' (toplumsal)' : ''}`, pb.value, pb.sub, { extra: timeline }),
-    kpi(P.users, other === 'eco' ? 'Toplumsal NBD' : 'Mali NBD', F.tlShort(res[other].npv), other === 'eco' ? `F/M ${F.num(res.eco.bcr, 2)} · yıllık ${F.tlShort(res.year1.ecoNet)}` : `F/M ${F.num(res.fin.bcr, 2)} · belediye kasası`, { neg: res[other].npv < 0 }),
-    kpi(P.leaf, 'CO₂ azaltımı', `${F.num(res.co2, 0)} ton/yıl`, `Ömür boyunca ${F.num(res.co2 * res.life, 0)} ton`),
-  ].join('');
+  const cards = { q1: qPayback(model, res), q2: qBudget(model, res), q3: qConfidence(model, mc, basis), q4: qDrivers(model, basis, tor), q5: qCity(model, res) };
+  const order = p === 'fin' ? ['q1', 'q2', 'q3', 'q4', 'q5'] : ['q1', 'q5', 'q3', 'q4', 'q2'];
 
-  const edited = model.inputs.filter(i => state.values[model.id][i.key] !== i.value).length;
-  $('#edited-count').textContent = edited ? `${edited} alan düzenlendi` : 'Örnek değerler';
+  box.innerHTML = `
+    <section class="answer card ${vd.level}" id="answer">
+      <div class="answer-head"><span class="kicker">Kısa cevap</span>${statusChip(vd)}</div>
+      <h2>${vd.title}</h2>
+      <p>${vd.text}</p>
+      <div class="facts">${factHtml}</div>
+      ${caution}
+    </section>
+    ${order.map(id => cards[id]).join('')}`;
 
-  renderPanels();
-  renderLiveBar(model, res, mc, vd);
-}
-
-function renderPanels() {
-  const { model, res, mc, tor, basis } = current;
-  const sim = mc[basis];
-  const seg = `<div class="seg no-print" role="group" aria-label="Analiz bakışı">${['fin', 'eco'].map(b => `<button type="button" data-basis="${b}" aria-pressed="${b === basis}">${b === 'fin' ? 'Mali' : 'Toplumsal'}</button>`).join('')}</div>`;
-  const hasSocial = res.lines.some(l => l.kind === 'social') || res.co2Value > 0;
-  const pbFin = paybackInfo(res, 'fin');
-  const flowsTable = res.fin.flows.map((f, t) => `<tr><td>${t}</td><td class="num">${F.tl(f)}</td><td class="num">${F.tl(res.fin.cumulative[t])}</td><td class="num">${F.tl(res.eco.flows[t])}</td><td class="num">${F.tl(res.eco.cumulative[t])}</td></tr>`).join('');
-  const lineRows = res.lines.map(l => `<tr><td>${esc(l.label)}<br><span class="kind ${l.kind}">${KIND_LABEL[l.kind]}${l.esc ? ' · fiyat artışına bağlı' : ''}</span></td><td class="num${l.value < 0 ? ' neg-text' : ''}">${F.tl(l.value)}</td></tr>`).join('');
-  const co2Row = res.co2Value > 0 ? `<tr><td>Azaltılan CO₂’nin değeri<br><span class="kind social">Toplumsal</span></td><td class="num">${F.tl(res.co2Value)}</td></tr>` : '';
-  const insight = html => `<div class="insight">${svg(P.spark)}<div>${html}</div></div>`;
-  const neg = x => (x < 0 ? 'neg-text' : '');
-
-  const panels = {
-    akis: `
-      <div class="apanel-head"><div><h2>Kümülatif net değer</h2><p class="sub">Bugünkü değerle. Eğrinin sıfırı kestiği nokta iskontolu geri ödeme süresi, son noktası net bugünkü değerdir.</p></div></div>
-      <div class="legend"><span><i class="line fin"></i>Mali (belediye kasası)</span><span><i class="line eco"></i>Toplumsal</span><span><i class="mark"></i>Geri ödeme noktası</span></div>
-      <div class="chart-box" data-chart="cum"></div>
-      <details class="more"><summary>Yıllık nakit akışı tablosu</summary>
-        <div class="table-wrap"><table><thead><tr><th>Yıl</th><th class="num">Mali akış</th><th class="num">Mali kümülatif (BD)</th><th class="num">Toplumsal akış</th><th class="num">Toplumsal kümülatif (BD)</th></tr></thead><tbody>${flowsTable}</tbody></table></div>
-      </details>`,
-    belirsizlik: `
-      <div class="apanel-head"><p class="sub">${F.num(mc.runs, 0)} simülasyon: etki varsayımları literatür aralığında, fiyat artışı ve yatırım maliyeti sapmasıyla birlikte rastgele değiştirildi. ${BASIS_LABEL[basis]} net bugünkü değerin dağılımı.</p>${seg}</div>
-      <div class="stat-chips">
-        <div class="stat-chip hl"><small>Olumlu sonuç olasılığı</small><b>${F.pct(sim.pPositive * 100, 0)}</b></div>
-        <div class="stat-chip"><small>Kötümser (P10)</small><b class="${neg(sim.p10)}">${F.tlShort(sim.p10)}</b></div>
-        <div class="stat-chip"><small>Ortanca (P50)</small><b class="${neg(sim.p50)}">${F.tlShort(sim.p50)}</b></div>
-        <div class="stat-chip"><small>İyimser (P90)</small><b class="${neg(sim.p90)}">${F.tlShort(sim.p90)}</b></div>
-      </div>
-      <div class="legend"><span><i class="neg"></i>NBD &lt; 0</span><span><i class="pos"></i>NBD ≥ 0</span><span><i class="ref"></i>Sıfır çizgisi</span></div>
-      <div class="chart-box" data-chart="hist"></div>
-      ${insight(`${oddsText(sim.pPositive)} yatırım ${basis === 'fin' ? 'belediye bütçesi' : 'toplum'} açısından kendini karşılıyor. Kötümser senaryoda (P10) sonuç ${F.tlShort(sim.p10)}.`)}`,
-    duyarlilik: `
-      <div class="apanel-head"><p class="sub">Her varsayım tek tek aralığının alt ve üst ucuna çekildiğinde ${BASIS_LABEL[basis].toLowerCase()} net bugünkü değer. Dikey gri çizgi mevcut sonuç (${F.tlShort(tor.base)}).</p>${seg}</div>
-      <div class="legend"><span><i class="lo"></i>Aralığın alt ucu</span><span><i class="hi"></i>Aralığın üst ucu</span></div>
-      <div class="chart-box" data-chart="tornado"></div>
-      ${breakEvenNotes(model, basis, tor).map(insight).join('')}`,
-    dokum: `
-      <div class="apanel-head"><div><h2>1. yılın etki dökümü</h2><p class="sub">Pozitif değerler tasarruf veya gelir, negatif değerler ek giderdir.</p></div></div>
-      <div class="legend"><span><i class="pos"></i>Tasarruf / gelir</span><span><i class="neg"></i>Ek gider</span></div>
-      <div class="chart-box" data-chart="lines"></div>
-      <div class="table-wrap"><table>
-        <tbody>${lineRows}${co2Row}</tbody>
-        <tfoot>
-          <tr><td>Belediye kasasına net etki</td><td class="num">${F.tl(res.year1.cashNet)}</td></tr>
-          <tr><td>Toplumsal net etki <span class="kind">(transferler hariç)</span></td><td class="num">${F.tl(res.year1.ecoNet)}</td></tr>
-        </tfoot>
-      </table></div>
-      <dl class="phys">${res.physical.map(p => `<div><dt>${esc(p.label)}</dt><dd>${F.unitValue(p.value, p.unit)}</dd></div>`).join('')}<div><dt>Yıllık CO₂ azaltımı</dt><dd>${F.num(res.co2, 1)} ton</dd></div></dl>`,
-    yorum: `
-      <div class="narrative">
-        <h2>Belediye bu sonuçtan ne anlamalı?</h2>
-        <ul>
-          <li>Yatırım maliyeti<b>${F.tlShort(res.investment)}</b></li>
-          <li>Yıllık brüt tasarruf / gelir<b>${F.tlShort(res.year1.cashIn)}</b></li>
-          <li>Yıllık ek işletme gideri<b>${F.tlShort(res.year1.cashOut)}</b></li>
-          <li>Yıllık net etki (belediye)<b>${F.tlShort(res.year1.cashNet)}</b></li>
-          <li>Basit geri ödeme süresi<b>${esc(pbFin.value)}</b></li>
-          ${hasSocial ? `<li>Yıllık toplumsal fayda (CO₂ dahil)<b>${F.tlShort(res.year1.ecoNet)}</b></li>` : ''}
-        </ul>
-        <p>${res.fin.payback != null
-          ? `Bu varsayımlar altında yatırım ilk maliyetini yaklaşık ${F.years(res.fin.payback)} içinde karşılar.`
-          : 'Bu varsayımlar altında yatırım, ekonomik ömrü içinde belediye bütçesine ilk maliyetini geri kazandırmaz.'}
-          Bu, yatırımın kesinlikle kârlı ya da kârsız olacağı anlamına gelmez; gerçek sonuç ölçülen tasarrufa, sistemin ömrüne ve maliyet değişimlerine bağlıdır. Belirsizlik ve duyarlılık sekmeleri sonucun bu değişimlere ne kadar dayanıklı olduğunu gösterir.</p>
-      </div>`,
-  };
-
-  $('#apanels').innerHTML = ANALYSIS_TABS.map(t => `<div class="apanel" role="tabpanel" id="panel-${t.id}" aria-labelledby="tab-${t.id}" data-panel="${t.id}">${panels[t.id]}</div>`).join('');
-  $('#apanels').querySelectorAll('[data-basis]').forEach(b => b.addEventListener('click', () => {
+  // Ayrıntı bölümleri: açık olanlar korunur, açıldıklarında grafikleri çizilir.
+  box.querySelectorAll('details[data-id]').forEach(d => {
+    if (openDetails.has(d.dataset.id)) d.open = true;
+    d.addEventListener('toggle', () => {
+      if (d.open) { openDetails.add(d.dataset.id); drawCharts(d); } else openDetails.delete(d.dataset.id);
+    });
+    if (d.open) drawCharts(d);
+  });
+  box.querySelectorAll('[data-basis]').forEach(b => b.addEventListener('click', () => {
     state.basis[model.id] = b.dataset.basis;
     save();
     renderResults(model);
   }));
-  showTab(model, false);
+
+  renderDock(model, res, mc, vd);
 }
 
-function oddsText(p) {
-  const n = Math.round(p * 10);
-  if (n >= 10) return 'Senaryoların neredeyse tamamında';
-  if (n <= 0) return 'Senaryoların neredeyse hiçbirinde';
-  return `Her 10 senaryodan yaklaşık <b>${n}</b> tanesinde`;
+function qCard(id, icon, title, body, detailsTitle, detailsBody) {
+  return `<section class="q card" id="${id}">
+    <div class="q-head"><span class="q-icon">${svg(icon)}</span><h3>${title}</h3></div>
+    ${body}
+    ${detailsBody ? `<details data-id="${id}"><summary>${detailsTitle}</summary><div>${detailsBody}</div></details>` : ''}
+  </section>`;
 }
 
-function showTab(model, animate) {
-  const active = state.tab[model.id];
-  document.querySelectorAll('#analysis .atab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === active)));
-  document.querySelectorAll('#apanels .apanel').forEach(p => {
-    const on = p.dataset.panel === active;
-    p.hidden = !on;
-    p.classList.toggle('enter', on && animate);
-  });
-  drawCharts($(`#panel-${active}`));
+function qPayback(model, res) {
+  const p = model.primary;
+  const s = res[p];
+  const N = res.life;
+  let lines;
+  if (res.fin.payback != null) {
+    lines = `<p class="answer-line">Basit hesapla <b>${F.years(res.fin.payback)}</b> içinde kendini öder. Paranın zaman değeri hesaba katıldığında ${res.fin.dpayback != null ? `<b>${F.years(res.fin.dpayback)}</b> sürer` : 'ömrü içinde ödemez'}.</p>`;
+  } else {
+    const annual = res.year1.cashNet;
+    lines = `<p class="answer-line">Belediye bütçesi açısından ${N} yıllık ömrü içinde kendini ödemez${annual > 0 ? `; bunun için yaklaşık <b>${F.years(res.netInvestment / annual)}</b> gerekirdi` : ', çünkü yıllık net etkisi negatif'}.</p>`;
+    if (p === 'eco' && res.eco.payback != null) lines += `<p class="answer-line">Vatandaşın zaman ve yakıt kazançları dahil şehir geneli açısından ise <b>${F.years(res.eco.payback)}</b> içinde kendini öder.</p>`;
+  }
+  const pb = s.payback;
+  const within = pb != null && pb <= N;
+  const pos = within ? Math.min(100, pb / N * 100) : 0;
+  const timeline = `
+    <div class="timeline" role="img" aria-label="${within ? `${F.years(pb)} içinde geri ödeme, ömür ${N} yıl` : `Ömür içinde geri ödeme yok, ömür ${N} yıl`}">
+      ${within ? `<div class="fill" style="width:${pos}%"></div><span class="pin" style="left:${Math.max(8, Math.min(92, pos))}%">${F.years(pb)}</span>` : '<div class="over"></div>'}
+    </div>
+    <div class="timeline-scale"><span>Bugün</span><span>${p === 'eco' ? 'Şehir geneli · ' : ''}ömür sonu: ${N}. yıl</span></div>`;
+  const flowsTable = res.fin.flows.map((f, t) => `<tr><td>${t}</td><td class="num">${F.tl(f)}</td><td class="num">${F.tl(res.fin.cumulative[t])}</td><td class="num">${F.tl(res.eco.flows[t])}</td><td class="num">${F.tl(res.eco.cumulative[t])}</td></tr>`).join('');
+  const details = `
+    <div class="legend"><span><i class="line fin"></i>Belediye bütçesi</span><span><i class="line eco"></i>Şehir geneli</span><span><i class="mark"></i>Geri ödeme noktası</span></div>
+    <p class="soft" style="font-size:14px;margin-bottom:6px">Bugünkü değerle kümülatif net değer. Eğrinin sıfırı kestiği yer iskontolu geri ödeme süresidir.</p>
+    <div class="chart-box" data-chart="cum"></div>
+    <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Yıl</th><th class="num">Bütçe akışı</th><th class="num">Bütçe kümülatif (BD)</th><th class="num">Şehir akışı</th><th class="num">Şehir kümülatif (BD)</th></tr></thead><tbody>${flowsTable}</tbody></table></div>`;
+  return qCard('q1', P.clock, 'Kendini ne zaman öder?', lines + timeline, 'Yıllara göre grafik ve tablo', details);
 }
 
-// Yalnızca görünür panellerin grafikleri çizilir (gizli kapsayıcının genişliği 0'dır).
-// Yazdırmada sayfa genişliğine uygun sabit bir genişlik verilir.
+function qBudget(model, res) {
+  const y = res.year1;
+  const rate = state.globals.finRate;
+  let body = y.cashNet >= 0
+    ? `<p class="answer-line">Her yıl yaklaşık <b>${F.tlShort(y.cashNet)}</b> net tasarruf: ${F.tlShort(y.cashIn)} tasarruf veya gelir, ${F.tlShort(y.cashOut)} ek gider.</p>`
+    : `<p class="answer-line">Her yıl belediyeye yaklaşık <b class="neg-text">${F.tlShort(-y.cashNet)}</b> ek yük getirir (${F.tlShort(y.cashIn)} tasarruf, ${F.tlShort(y.cashOut)} ek gider).</p>`;
+  body += `<p class="answer-line soft">Ömrü boyunca bugünkü değerle net etki <b class="${res.fin.npv < 0 ? 'neg-text' : ''}">${F.tlShort(res.fin.npv)}</b>.${res.fin.irr != null ? ` Yatırımın yıllık getirisi (İVO ${F.pct(res.fin.irr * 100)}), belediyenin ${F.pct(rate)} iskonto oranından ${res.fin.irr * 100 > rate ? 'yüksek' : 'düşük'}.` : ''}</p>`;
+  if (res.grant > 0) body += `<p class="answer-line soft">${F.tlShort(res.grant)} hibe sayesinde belediyenin payı ${F.tlShort(res.netInvestment)}.</p>`;
+  body += `<div class="mini-facts">
+    <div>Yatırım<b>${F.tlShort(res.investment)}</b></div>
+    <div>Yıllık net<b class="${y.cashNet < 0 ? 'neg-text' : ''}">${F.tlShort(y.cashNet)}</b></div>
+    <div>İç verim oranı<b>${res.fin.irr != null ? F.pct(res.fin.irr * 100) : '—'}</b></div>
+    <div>Fayda / maliyet<b>${F.num(res.fin.bcr, 2)}</b></div>
+  </div>`;
+  const rows = res.lines.map(l => `<tr><td>${esc(l.label)}<br><span class="kind ${l.kind}">${KIND_LABEL[l.kind]}${l.esc ? ' · fiyat artışına bağlı' : ''}</span></td><td class="num${l.value < 0 ? ' neg-text' : ''}">${F.tl(l.value)}</td></tr>`).join('');
+  const co2Row = res.co2Value > 0 ? `<tr><td>Azaltılan CO₂’nin değeri<br><span class="kind social">Toplum</span></td><td class="num">${F.tl(res.co2Value)}</td></tr>` : '';
+  const details = `
+    <div class="legend"><span><i class="pos"></i>Tasarruf / gelir</span><span><i class="neg"></i>Ek gider</span></div>
+    <div class="chart-box" data-chart="lines"></div>
+    <div class="table-wrap" style="margin-top:12px"><table>
+      <tbody>${rows}${co2Row}</tbody>
+      <tfoot><tr><td>Belediye bütçesine net etki</td><td class="num">${F.tl(y.cashNet)}</td></tr><tr><td>Şehir geneline net etki</td><td class="num">${F.tl(y.ecoNet)}</td></tr></tfoot>
+    </table></div>`;
+  return qCard('q2', P.wallet, 'Belediye bütçesine ne kazandırır?', body, 'Kalem kalem döküm', details);
+}
+
+function qConfidence(model, mc, basis) {
+  const sim = mc[basis];
+  const k = outOfTen(sim.pPositive);
+  const dots = Array.from({ length: 10 }, (_, i) => `<i class="${i < k ? 'on' : 'off'}"></i>`).join('');
+  const body = `
+    <p class="answer-line">Tasarruf oranları, fiyatlar ve maliyetler makul aralıklarda değiştirildiğinde <b>10 senaryodan ${LOC[k]}</b> yatırım ${WHO[basis]} açısından kendini öder.</p>
+    <div class="dots" role="img" aria-label="10 senaryodan ${k} olumlu">${dots}</div>
+    <div class="dots-key"><span><i class="on"></i>Kendini öder</span><span><i class="off"></i>Ödemez</span></div>
+    <p class="answer-line soft" style="margin-top:12px">Büyük olasılıkla (10 senaryodan 8’inde) net değer <b>${F.tlShort(sim.p10)}</b> ile <b>${F.tlShort(sim.p90)}</b> arasında olur.</p>`;
+  const seg = `<div class="seg" role="group" aria-label="Bakış açısı">${['fin', 'eco'].map(b => `<button type="button" data-basis="${b}" aria-pressed="${b === basis}">${b === 'fin' ? 'Belediye bütçesi' : 'Şehir geneli'}</button>`).join('')}</div>`;
+  const details = `${seg}
+    <p class="soft" style="font-size:14px">${F.num(mc.runs, 0)} simülasyonda net bugünkü değerin dağılımı. Varsayımlar kaynaklardaki aralıkta, yatırım maliyeti −%5 ile +%30 arasında değiştirildi.</p>
+    <div class="legend"><span><i class="pos"></i>Kendini öder</span><span><i class="neg"></i>Ödemez</span><span><i class="ref"></i>Sıfır çizgisi</span></div>
+    <div class="chart-box" data-chart="hist"></div>`;
+  return qCard('q3', P.shield, 'Bu sonuçtan ne kadar emin olabiliriz?', body, 'Dağılım grafiği ve bakış açısı', details);
+}
+
+function qDrivers(model, basis, tor) {
+  const notes = driverNotes(model, basis, tor);
+  const body = `<ul class="drivers">${notes.map(n => `<li>${svg(P.bulb)}<span>${n}</span></li>`).join('')}</ul>`;
+  const details = `
+    <p class="soft" style="font-size:14px">Her varsayım tek tek kaynaklardaki aralığın alt ve üst ucuna çekildiğinde ${WHO[basis]} için net değer. Gri çizgi şu anki sonuç (${F.tlShort(tor.base)}).</p>
+    <div class="legend"><span><i class="pos"></i>Sonucu iyileştirir</span><span><i class="neg"></i>Sonucu kötüleştirir</span></div>
+    <div class="chart-box" data-chart="tornado"></div>`;
+  return qCard('q4', P.sliders, 'Sonucu en çok ne değiştirir?', body, 'Duyarlılık grafiği', details);
+}
+
+function qCity(model, res) {
+  const body = `
+    <p class="answer-line">Vatandaşın ve kamunun kazançları dahil şehre bugünkü değerle <b class="${res.eco.npv < 0 ? 'neg-text' : ''}">${F.tlShort(res.eco.npv)}</b> net değer${res.eco.bcr != null ? `; her 1 TL maliyete karşılık <b>${F.num(res.eco.bcr, 2)} TL</b> fayda` : ''}.</p>
+    <p class="answer-line soft">Yılda yaklaşık <b>${F.num(res.co2, 0)} ton</b> CO₂ salımı önlenir; ömür boyunca ${F.num(res.co2 * res.life, 0)} ton.</p>
+    <dl class="phys">${res.physical.map(x => `<div><dt>${esc(x.label)}</dt><dd>${F.unitValue(x.value, x.unit)}</dd></div>`).join('')}</dl>`;
+  return qCard('q5', P.leaf, 'Şehre ve çevreye etkisi ne?', body);
+}
+
+// Yalnızca açık ayrıntı bölümlerindeki grafikler çizilir (kapalı bölümün genişliği 0'dır).
 const PRINT_WIDTH = 640;
 function drawCharts(scope, fixedWidth) {
   if (!scope || !current) return;
@@ -576,21 +613,22 @@ function drawCharts(scope, fixedWidth) {
     if (kind === 'cum') {
       const p = model.primary;
       const d = res[p].dpayback;
-      const markers = d != null && d > 0 ? [{ t: d, value: 0, label: `${p === 'fin' ? 'Mali' : 'Toplumsal'} geri ödeme · ${F.years(d)}` }] : [];
+      const markers = d != null && d > 0 ? [{ t: d, value: 0, label: `Geri ödeme · ${F.years(d)}` }] : [];
       box.innerHTML = lineChart({
-        width: w(box), height: 280, area: true, markers, fmt: fmtTL,
-        series: [{ name: 'Mali', cls: 'fin', values: res.fin.cumulative }, { name: 'Toplumsal', cls: 'eco', values: res.eco.cumulative }],
+        width: w(box), height: 260, markers, fmt: fmtTL,
+        series: [{ name: 'Belediye bütçesi', cls: 'fin', values: res.fin.cumulative }, { name: 'Şehir geneli', cls: 'eco', values: res.eco.cumulative }],
       });
     } else if (kind === 'hist') {
       box.innerHTML = histogram({ width: w(box), samples: mc[basis].samples, fmt: fmtTL });
     } else if (kind === 'tornado') {
+      const tip = (r, x, npv) => `<div class="tip-title">${esc(r.param.label)}</div><div class="tip-row"><span class="key ${npv >= tor.base ? 'pos' : 'neg'}"></span>${paramValueText(r.param, x)} olursa<b>${F.tlShort(npv)}</b></div>`;
       box.innerHTML = hbarChart({
         width: w(box), fmt: fmtTL, refLines: [{ value: tor.base, cls: 'base' }, { value: 0 }],
         rows: tor.rows.map(r => ({
           label: `${r.param.label} (${paramValueText(r.param, r.lo)} … ${paramValueText(r.param, r.hi)})`,
           bars: [
-            { from: tor.base, to: r.loNpv, cls: 'lo', tip: `<div class="tip-title">${esc(r.param.label)}</div><div class="tip-row"><span class="key lo"></span>${paramValueText(r.param, r.lo)} olursa<b>${F.tlShort(r.loNpv)}</b></div>` },
-            { from: tor.base, to: r.hiNpv, cls: 'hi', tip: `<div class="tip-title">${esc(r.param.label)}</div><div class="tip-row"><span class="key hi"></span>${paramValueText(r.param, r.hi)} olursa<b>${F.tlShort(r.hiNpv)}</b></div>` },
+            { from: tor.base, to: r.loNpv, cls: r.loNpv >= tor.base ? 'pos' : 'neg', tip: tip(r, r.lo, r.loNpv) },
+            { from: tor.base, to: r.hiNpv, cls: r.hiNpv >= tor.base ? 'pos' : 'neg', tip: tip(r, r.hi, r.hiNpv) },
           ],
         })),
       });
@@ -607,117 +645,89 @@ function drawCharts(scope, fixedWidth) {
   });
 }
 
-function renderLiveBar(model, res, mc, vd) {
-  const p = model.primary;
-  $('#live-bar').innerHTML = `
-    <div class="lb-name"><span class="status-dot ${vd.level}"></span><span>${model.short}</span></div>
-    <div class="lb-item">${p === 'fin' ? 'Mali' : 'Toplumsal'} NBD<b class="${res[p].npv < 0 ? 'neg' : ''}">${F.tlShort(res[p].npv)}</b></div>
-    <div class="lb-item">Geri ödeme<b>${res[p].payback != null ? F.years(res[p].payback) : '—'}</b></div>
-    <div class="lb-item opt">Olasılık<b>${F.pct(mc[p].pPositive * 100, 0)}</b></div>
-    <button type="button" class="btn" data-scroll-top>Özet ↑</button>`;
+// Mobilde kısa cevap kartı ekrandan çıkınca altta küçük bir özet görünür.
+function renderDock(model, res, mc, vd) {
+  const dock = $('#answer-dock');
+  dock.innerHTML = `<span class="ad-dot" style="background:${STATUS_COLOR[vd.level]}"></span>
+    <div class="ad-text"><b>${vd.label}</b>${shortAnswer(model, res)} · güven 10’da ${outOfTen(mc[model.primary].pPositive)}</div>
+    <button type="button" class="btn" data-scroll-answer>Cevap ↑</button>`;
+  answerObserver?.disconnect();
+  answerObserver = new IntersectionObserver(([entry]) => { dock.hidden = entry.isIntersecting || entry.boundingClientRect.top > 0; });
+  answerObserver.observe($('#answer'));
 }
 
 // ---------- Karşılaştırma ----------
 
-function annuity(npvValue, rate, n) {
-  return rate === 0 ? npvValue / n : npvValue * rate / (1 - Math.pow(1 + rate, -n));
-}
-
 function renderCompare() {
   const rows = MODELS.map(m => ({ m, ...analyse(m) }));
   const inc = rows.filter(r => state.include[r.m.id]);
-  const finRate = state.globals.finRate / 100, ecoRate = state.globals.ecoRate / 100;
   const sum = f => inc.reduce((s, r) => s + f(r), 0);
+  const pi = r => r.res.eco.npv / r.res.investment;
+  const ranked = [...inc].sort((a, b) => pi(b) - pi(a));
+  const excluded = rows.filter(r => !state.include[r.m.id]);
 
-  const cards = rows.map(({ m, res, mc }) => {
+  const item = (r, no) => {
+    const { m, res, mc } = r;
     const vd = verdict(m, res, mc);
-    const npv = res[m.primary].npv;
-    return `<article class="inv-card panel${state.include[m.id] ? '' : ' off'}">
-      <div class="inv-card-head"><span class="nav-icon">${svg(m.icon)}</span><b>${m.name}</b>
-        <label class="switch" title="Portföye dahil et"><input type="checkbox" data-include="${m.id}" ${state.include[m.id] ? 'checked' : ''} aria-label="${m.name} portföye dahil"><span></span></label></div>
-      <span class="status-text ${vd.level}"><span class="status-dot ${vd.level}"></span>${vd.label}</span>
-      <div class="value-label">${m.primary === 'fin' ? 'Mali' : 'Toplumsal'} net bugünkü değer</div>
-      <div class="value${npv < 0 ? ' neg' : ''}">${F.tlShort(npv)}</div>
-      <div class="mini">
-        <div>Yatırım<b>${F.tlShort(res.investment)}</b></div>
-        <div>Geri ödeme<b>${res[m.primary].payback != null ? F.years(res[m.primary].payback) : '—'}</b></div>
-        <div>Olumlu olasılık<b>${F.pct(mc[m.primary].pPositive * 100, 0)}</b></div>
-        <div>CO₂<b>${F.num(res.co2, 0)} t/yıl</b></div>
-      </div>
-      <a class="more" href="#${m.id}">Ayrıntılı analiz →</a>
-    </article>`;
-  }).join('');
-
-  const ranked = [...inc].sort((a, b) => b.res.eco.npv / b.res.investment - a.res.eco.npv / a.res.investment);
-  const maxPi = Math.max(...ranked.map(r => r.res.eco.npv / r.res.investment), 0.0001);
-  const rankHtml = ranked.map(({ m, res }, k) => {
-    const pi = res.eco.npv / res.investment;
     const fi = res.fin.npv / Math.max(res.netInvestment, 1);
-    return `<li><span class="medal">${k + 1}</span><div>
-      <div class="r-name">${m.name}</div>
-      <div class="r-bar"><i style="width:${Math.max(0, pi / maxPi) * 100}%"></i></div>
-      <div class="r-meta">1 TL yatırım başına toplumsal değer <b>${F.num(pi, 2)} TL</b> · belediye kasası <b>${F.num(fi, 2)} TL</b> · yıllık eşdeğer mali değer ${F.tlShort(annuity(res.fin.npv, finRate, res.life))}</div>
-    </div></li>`;
-  }).join('');
+    const pay = res.fin.payback != null ? `Belediye bütçesine ${F.years(res.fin.payback)} içinde geri döner.` : 'Belediye bütçesine ömrü içinde geri dönmez.';
+    const per = (x, whom) => (x >= 0 ? `${whom} <b>${F.num(x, 2)} TL</b> net değer kazandırır` : `${whom} <b>${F.num(-x, 2)} TL</b> net yük getirir`);
+    return `<li class="rank-item card${state.include[m.id] ? '' : ' off'}">
+      <span class="rank-no">${no ?? '–'}</span>
+      <div>
+        <h3><a href="#${m.id}" style="color:inherit;text-decoration:none">${m.name}</a> ${statusChip(vd)}</h3>
+        <p>Yatırılan her 1 TL, ${per(pi(r), 'şehre')}; ${per(fi, 'belediye bütçesine')}. ${pay} Yatırım: ${F.tlShort(res.investment)}.</p>
+      </div>
+      <label class="toggle no-print"><input type="checkbox" data-include="${m.id}" ${state.include[m.id] ? 'checked' : ''}>Planda</label>
+    </li>`;
+  };
 
   const table = rows.map(({ m, res, mc }) => `<tr>
       <td><a href="#${m.id}">${m.name}</a></td>
       <td class="num">${F.tlShort(res.investment)}</td>
       <td class="num${res.year1.cashNet < 0 ? ' neg-text' : ''}">${F.tlShort(res.year1.cashNet)}</td>
-      <td class="num">${res.fin.payback != null ? F.years(res.fin.payback) : esc(paybackInfo(res).value)}</td>
+      <td class="num">${res.fin.payback != null ? F.years(res.fin.payback) : '—'}</td>
       <td class="num${res.fin.npv < 0 ? ' neg-text' : ''}">${F.tlShort(res.fin.npv)}</td>
       <td class="num">${res.fin.irr != null ? F.pct(res.fin.irr * 100) : '—'}</td>
-      <td class="num">${F.pct(mc.fin.pPositive * 100, 0)}</td>
+      <td class="num">10’da ${outOfTen(mc.fin.pPositive)}</td>
       <td class="num${res.eco.npv < 0 ? ' neg-text' : ''}">${F.tlShort(res.eco.npv)}</td>
       <td class="num">${F.num(res.eco.bcr, 2)}</td>
-      <td class="num">${F.tlShort(annuity(res.eco.npv, ecoRate, res.life))}</td>
       <td class="num">${F.num(res.co2, 0)}</td>
     </tr>`).join('');
 
-  const cash = sum(r => r.res.year1.cashNet), pf = sum(r => r.res.fin.npv), pe = sum(r => r.res.eco.npv);
+  const fact = (label, value, sub) => `<div class="fact"><small>${label}</small><b class="${value.startsWith('-') ? 'neg-text' : ''}">${value}</b><span>${sub}</span></div>`;
   $('#view').innerHTML = `
     ${printMeta()}
-    <section class="page-hero panel">
-      <div class="eyebrow">Portföy görünümü</div>
-      <h1>Yatırımların karşılaştırılması</h1>
-      <p>Dört yatırım, her birinin sayfasında girilen verilerle aynı ekonomik ölçütlere göre yan yana. Belediyeye yalnızca tek bir yatırımın geri ödeme süresini değil, farklı yatırımları aynı terazide tartma imkânı verir.</p>
-      <div class="portfolio">
-        <div><small>Portföy yatırımı (${inc.length} yatırım)</small><b>${F.tlShort(sum(r => r.res.investment))}</b></div>
-        <div><small>Yıllık net nakit etkisi</small><b class="${cash < 0 ? 'neg' : ''}">${F.tlShort(cash)}</b></div>
-        <div><small>Toplam mali NBD</small><b class="${pf < 0 ? 'neg' : ''}">${F.tlShort(pf)}</b></div>
-        <div><small>Toplam toplumsal NBD</small><b class="${pe < 0 ? 'neg' : ''}">${F.tlShort(pe)}</b></div>
-      </div>
-    </section>
-    <div class="inv-cards reveal">${cards}</div>
-    <div class="compare-grid">
-      <section class="panel panel-pad">
-        <h2>Net bugünkü değer</h2>
-        <p class="sub">Mali analiz belediye bütçesini, toplumsal analiz şehrin bütününü gösterir.</p>
-        <div class="legend"><span><i class="fin"></i>Mali NBD</span><span><i class="eco"></i>Toplumsal NBD</span><span><i class="ref"></i>Sıfır çizgisi</span></div>
-        <div class="chart-box" id="chart-compare"></div>
-      </section>
-      <section class="panel panel-pad">
-        <h2>Bütçe kısıtlıysa öncelik sırası</h2>
-        <p class="sub">Yatırılan her 1 TL’nin yarattığı toplumsal net değere (kârlılık endeksi) göre. Bütçe sınırlıyken toplam NBD’den çok bu oran belirleyicidir.</p>
-        ${ranked.length ? `<ol class="rank">${rankHtml}</ol>` : '<p class="sub">Sıralama için en az bir yatırımı portföye dahil edin.</p>'}
-      </section>
+    <div class="intro">
+      <p class="kicker">Karşılaştırma</p>
+      <h1>Hangi yatırım önce yapılmalı?</h1>
+      <p>Bütçe sınırlıyken en çok değeri yaratan yatırım öne alınır. Sıralama, yatırılan her 1 TL’nin şehre kazandırdığı net değere göredir. “Planda” kutusuyla yatırımları plana ekleyip çıkarabilirsiniz.</p>
     </div>
-    <section class="panel panel-pad">
-      <h2>Ayrıntılı tablo</h2>
-      <p class="sub">Ömürleri farklı yatırımlar için yıllık eşdeğer değer daha adil bir kıyas sağlar.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Yatırım</th><th class="num">Yatırım</th><th class="num">Yıllık net nakit</th><th class="num">Geri ödeme</th><th class="num">Mali NBD</th><th class="num">Mali İVO</th><th class="num">Olumlu olasılık (mali)</th><th class="num">Toplumsal NBD</th><th class="num">Toplumsal F/M</th><th class="num">Yıllık eşdeğer (toplumsal)</th><th class="num">CO₂ ton/yıl</th></tr></thead>
-        <tbody>${table}</tbody>
-      </table></div>
+    <div class="summary-strip">
+      ${fact('Plandaki toplam yatırım', F.tlShort(sum(r => r.res.investment)), `${inc.length} yatırım`)}
+      ${fact('Bütçeye yıllık net etki', F.tlShort(sum(r => r.res.year1.cashNet)), '1. yıl')}
+      ${fact('Bütçeye net kazanç', F.tlShort(sum(r => r.res.fin.npv)), 'Bugünkü değerle')}
+      ${fact('Şehre net değer', F.tlShort(sum(r => r.res.eco.npv)), 'Bugünkü değerle')}
+    </div>
+    <ol class="rank-list">${ranked.map((r, i) => item(r, i + 1)).join('')}${excluded.map(r => item(r, null)).join('')}</ol>
+    <section class="card pad">
+      <h2 style="font-size:19px">Net değer karşılaştırması</h2>
+      <p class="soft" style="color:var(--text-2);font-size:14.5px;margin:4px 0 10px">Belediye bütçesi ve şehir geneli için, bugünkü değerle.</p>
+      <div class="legend"><span><i class="fin"></i>Belediye bütçesi</span><span><i class="eco"></i>Şehir geneli</span><span><i class="ref"></i>Sıfır çizgisi</span></div>
+      <div class="chart-box" id="chart-compare"></div>
+      <details style="margin-top:14px"><summary style="cursor:pointer;color:var(--primary);font-weight:600">Ayrıntılı tablo</summary>
+        <div class="table-wrap" style="margin-top:10px"><table>
+          <thead><tr><th>Yatırım</th><th class="num">Yatırım</th><th class="num">Yıllık net</th><th class="num">Geri ödeme</th><th class="num">Bütçe NBD</th><th class="num">İVO</th><th class="num">Güven (bütçe)</th><th class="num">Şehir NBD</th><th class="num">Fayda/maliyet</th><th class="num">CO₂ ton/yıl</th></tr></thead>
+          <tbody>${table}</tbody>
+        </table></div>
+      </details>
     </section>`;
 
   $('#view').querySelectorAll('[data-include]').forEach(cb => cb.addEventListener('change', () => {
     state.include[cb.dataset.include] = cb.checked;
     save();
     renderCompare();
-    $('.inv-cards')?.classList.remove('reveal');
   }));
-  setTimeout(() => $('.inv-cards')?.classList.remove('reveal'), 700);
 
   const box = $('#chart-compare');
   box.innerHTML = hbarChart({
@@ -725,8 +735,8 @@ function renderCompare() {
     rows: rows.map(({ m, res }) => ({
       label: m.name,
       bars: [
-        { from: 0, to: res.fin.npv, cls: 'fin', tip: `<div class="tip-title">${m.name}</div><div class="tip-row"><span class="key fin"></span>Mali NBD<b>${F.tlShort(res.fin.npv)}</b></div>` },
-        { from: 0, to: res.eco.npv, cls: 'eco', tip: `<div class="tip-title">${m.name}</div><div class="tip-row"><span class="key eco"></span>Toplumsal NBD<b>${F.tlShort(res.eco.npv)}</b></div>` },
+        { from: 0, to: res.fin.npv, cls: 'fin', tip: `<div class="tip-title">${m.name}</div><div class="tip-row"><span class="key fin"></span>Belediye bütçesi<b>${F.tlShort(res.fin.npv)}</b></div>` },
+        { from: 0, to: res.eco.npv, cls: 'eco', tip: `<div class="tip-title">${m.name}</div><div class="tip-row"><span class="key eco"></span>Şehir geneli<b>${F.tlShort(res.eco.npv)}</b></div>` },
       ],
     })),
   });
@@ -736,7 +746,7 @@ function renderCompare() {
 
 function renderMethod(anchor) {
   $('#view').innerHTML = $('#tpl-yontem').innerHTML;
-  $('#view .prose').classList.add('panel');
+  $('#view .prose').classList.add('card');
   $('#source-list').innerHTML = Object.entries(SOURCES).map(([k, s]) =>
     `<li id="kaynak-${k}"><b>[${k}]</b> ${esc(s.full)}<span class="use">Kullanım: ${esc(s.use)}</span></li>`).join('');
   if (anchor) {
@@ -754,6 +764,7 @@ function rerenderCurrent() {
   const m = modelById(currentPage);
   if (m) renderResults(m);
   else if (currentPage === 'karsilastirma') renderCompare();
+  else if (currentPage === 'baslangic') renderStart();
   renderNav();
 }
 
@@ -770,10 +781,10 @@ function setupSettings() {
   $('#g-municipality').addEventListener('input', e => { state.municipality = e.target.value.slice(0, 120); save(); renderNav(); });
   $('#g-preparer').addEventListener('input', e => { state.preparer = e.target.value.slice(0, 120); save(); });
   $('#btn-reset-all').addEventListener('click', () => {
-    if (!confirm('Tüm yatırımların ve genel ayarların girdileri varsayılan değerlere döndürülsün mü?')) return;
+    if (!window.confirm('Tüm yatırımların ve genel ayarların girdileri örnek değerlere döndürülsün mü?')) return;
     const fresh = freshState();
     Object.assign(state.globals, fresh.globals);
-    for (const m of MODELS) Object.assign(state.values[m.id], fresh.values[m.id]);
+    for (const m of MODELS) { Object.assign(state.values[m.id], fresh.values[m.id]); state.confirmed[m.id] = []; }
     state.municipality = '';
     state.preparer = '';
     save();
@@ -801,7 +812,7 @@ async function loadFile(file) {
     for (const m of MODELS) Object.assign(state.values[m.id], loaded.values[m.id]);
     Object.assign(state.include, loaded.include);
     Object.assign(state.basis, loaded.basis);
-    Object.assign(state.tab, loaded.tab);
+    Object.assign(state.confirmed, loaded.confirmed);
     state.municipality = loaded.municipality;
     state.preparer = loaded.preparer;
     save();
@@ -812,9 +823,10 @@ async function loadFile(file) {
 }
 
 function toggleTheme() {
-  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-  document.documentElement.dataset.theme = next;
-  try { localStorage.setItem(THEME_KEY, next); } catch { /* yok say */ }
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem(THEME_KEY, root.dataset.theme); } catch { /* yok say */ }
 }
 
 function setupActions(openSettings) {
@@ -827,7 +839,7 @@ function setupActions(openSettings) {
       else if (act === 'theme') toggleTheme();
       else if (act === 'print') window.print();
     }
-    if (e.target.closest('[data-scroll-top]')) window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+    if (e.target.closest('[data-scroll-answer]')) $('#answer')?.scrollIntoView({ behavior: smooth(), block: 'start' });
   });
   document.querySelectorAll('input[data-action="load"]').forEach(inp => inp.addEventListener('change', e => {
     const file = e.target.files[0];
@@ -835,15 +847,14 @@ function setupActions(openSettings) {
     if (file) loadFile(file);
   }));
 
-  // Yazdırırken tüm analiz panelleri ve açılır bölümler görünür olur.
+  // Yazdırırken tüm ayrıntı bölümleri açılır ve grafikler sayfa genişliğinde çizilir.
   window.addEventListener('beforeprint', () => {
     document.querySelectorAll('#view details').forEach(d => { d.dataset.wasOpen = d.open; d.open = true; });
-    document.querySelectorAll('#apanels .apanel').forEach(p => { p.hidden = false; drawCharts(p, PRINT_WIDTH); });
+    document.querySelectorAll('#results details').forEach(d => drawCharts(d, PRINT_WIDTH));
   });
   window.addEventListener('afterprint', () => {
     document.querySelectorAll('#view details').forEach(d => { if (d.dataset.wasOpen === 'false') d.open = false; });
-    const m = modelById(currentPage);
-    if (m) showTab(m, false);
+    rerenderCurrent();
   });
 }
 
@@ -856,8 +867,7 @@ let lastWidth = window.innerWidth;
 window.addEventListener('resize', debounce(() => {
   if (window.innerWidth === lastWidth) return; // mobilde adres çubuğu kaymasıyla gelen yükseklik değişimlerini yok say
   lastWidth = window.innerWidth;
-  const m = modelById(currentPage);
-  if (m) drawCharts($(`#panel-${state.tab[m.id]}`));
+  if (modelById(currentPage)) document.querySelectorAll('#results details[open]').forEach(d => drawCharts(d));
   else if (currentPage === 'karsilastirma') renderCompare();
 }, 200));
 route();
