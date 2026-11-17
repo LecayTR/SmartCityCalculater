@@ -10,35 +10,43 @@ Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kulla
 |---|---|
 | [`ccr-32c2df3d-ftrlux`](../../tree/ccr-32c2df3d-ftrlux) | **v1 – Klasik:** sade, rapor odaklı, üst sekmeli; açık/koyu tema |
 | [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi:** koyu gösterge paneli, kenar menüde canlı durum ışıkları, olasılık halkası, sekmeli analiz |
-| [`tasarim-v4-sade`](../../tree/tasarim-v4-sade) | **v4 – Açık (bu dal):** yeşil kenar menü, sade çalışma alanı, yatırım kartları ve ayrıntılara aşamalı erişim |
-| [`tasarim-v3`](../../tree/tasarim-v3) | **v3 – Sakin:** sıcak açık zemin, yumuşak yeşil vurgu; yöneticinin sorduğu sorulara göre düzenlenmiş sonuçlar, rehberli veri girişi |
+| [`tasarim-v3`](../../tree/tasarim-v3) | **v3 – Sakin:** sıcak açık zemin, yumuşak yeşil vurgu; yöneticinin sorduğu sorulara göre düzenlenmiş sonuçlar, rehberli veri girişi, belgeden doldurma |
+| [`tasarim-v4-sade`](../../tree/tasarim-v4-sade) | **v4 – Açık (bu dal):** yeşil kenar menü, kent görselli açılış sayfası, sade çalışma alanı ve ayrıntılara aşamalı erişim |
 
 ### v4 – Açık (bu dal)
 
 `tasarim-v4-sade`, belge aktarımını da içeren `tasarim-v3` dalından ayrılmıştır. Açık gri çalışma alanı, koyu yeşil kenar menü ve okunabilir bir bilgi sıralaması kullanır. Hesap motoru, modeller, kaynaklar, sayı biçimlendirme ve belge işleme kodları v3 ile aynıdır.
 
-- **Genel bakış:** dört yatırım alanı, örnek senaryo sonuçları ve üç adımlı kullanım rehberi.
+- **Genel bakış:** ekran yüksekliğinde kent görseli, dört yatırım alanı kartı, özet göstergeler ve üç adımlı kullanım rehberi.
 - **Analiz:** ayrı veri girişi alanı, kısa karar özeti ve geri ödeme / bütçe / belirsizlik / duyarlılık / çevre bölümlerine hızlı erişim.
 - **Ayrıntılar:** grafikler, nakit akışları ve kalem dökümleri kullanıcı istediğinde açılır; raporda tüm ayrıntılar yer alır.
 - **Veri girişi:** mevcut durum önce açılır; maliyet ve etki varsayımları ayrı açılabilir bölümlerdedir. Belge aktarımı, veri kaynağı ve örnek değer etiketleri korunur.
+- **Genel ayarlar:** masaüstünde kenar menüdeki “Belediyeniz” düğmesinden, dar ekranda üst çubuktaki dişli simgesinden açılır.
 - **Dar ekran:** kaydırılabilir gezinme, tek sütunlu form ve sonuçlara doğrudan geçiş. Açık/koyu tema ve azaltılmış hareket tercihi desteklenir.
 - **Yayın:** `npm run build` yalnızca uygulama dosyalarını `dist/` klasörüne kopyalar. Sunucu veya paket bağımlılığı eklenmemiştir.
 
-Doğrulama: mevcut 32 test başarılı. Tarayıcıda canlı hesap, geçersiz girdi, açılan grafik/tablo, açık/koyu tema, karşılaştırma ve dar ekran kontrolü yapıldı. Görünüm örnekleri `docs/ekran-goruntuleri/v4-*.jpg` dosyalarındadır.
-
 #### Görsel genel bakış
 
-Açılış sahnesi yalnız genel bakışta sol menünün yanındaki alanı uçtan uca ve ekran yüksekliğinde doldurur. Araç çubuğu görsel üzerinde şeffaftır. İlk ekranda alt içerik görünmez; kaydırınca önce “Değişim nereden başlasın?” bölümü, ardından özet göstergeler gelir. Tekrarlayan alan düğmeleri kaldırılmıştır.
+Açılış sahnesi yalnız genel bakışta sol menünün yanındaki alanı uçtan uca ve ekran yüksekliğinde doldurur. Araç çubuğu görsel üzerinde şeffaftır. İlk ekranda alt içerik görünmez; kaydırınca önce “Değişim nereden başlasın?” bölümü, ardından özet göstergeler gelir.
 
-Genel bakış, ayrı `overview.js` ve `overview.css` dosyalarında düzenlenir; hesaplama sayfaları aynı kalır. Kent panoraması ve dört altyapı görseli bu proje için üretilmiş konsept görsellerdir. WebP dosyaları yerelden sunulur; ikisinin toplam boyutu yaklaşık 1 MB’dır.
+Genel bakış, ayrı `overview.js` ve `overview.css` dosyalarında düzenlenir; hesaplama sayfaları aynı kalır. Kent panoraması ve dört altyapı görseli bu proje için üretilmiş konsept görsellerdir. İki WebP dosyası yerelden sunulur; toplam boyutları yaklaşık 1 MB’dır.
 
-Görseldeki nokta düğmeleri yerine “Şehirdeki bir fırsat” kartı dört alanı 3,5 saniyede bir sırayla gösterir; başlık ve analiz bağlantısı birlikte değişir. Geçiş göstergesi yoktur. Klavyeyle bağlantıya odaklanıldığında hedef sabit kalır. Kent görseli yavaşça hareket eder; duraklatma düğmesi yoktur, işletim sisteminin azaltılmış hareket tercihi desteklenir. Kartlardaki fiziksel kazanımlar ve özet göstergeler mevcut hesap sonuçlarından alınır. Sayfadan ayrılınca zamanlayıcı, olay dinleyicileri ve gözlemciler temizlenir.
+“Şehirdeki bir fırsat” kartı dört alanı 3,5 saniyede bir sırayla gösterir; başlık ve analiz bağlantısı birlikte değişir. Klavyeyle bağlantıya odaklanıldığında kart sabit kalır. Kent görseli yavaşça hareket eder; işletim sisteminin azaltılmış hareket tercihi desteklenir. Kartlardaki fiziksel kazanımlar ve özet göstergeler mevcut hesap sonuçlarından alınır. Sayfadan ayrılınca zamanlayıcı, olay dinleyicileri ve gözlemciler temizlenir.
 
-Marka alt başlığı “Harcama Rehberi”dir. Üstteki yinelenen ayarlar düğmesi kaldırılmıştır; genel ayarlar sol menüdeki “Belediyeniz” üzerinden açılır. “Rapor al” mevcut sayfayı `window.print()` ile tarayıcının yazdırma penceresine gönderir; doğrudan PDF dosyası üretmez. Gömülü veya otomasyonlu önizleme yazdırma penceresini göstermeyebilir; analiz sayfası normal tarayıcı sekmesinde açılarak PDF olarak kaydedilebilir.
+Marka alt başlığı “Harcama Rehberi”dir. “Rapor al” mevcut sayfayı `window.print()` ile tarayıcının yazdırma penceresine gönderir; doğrudan PDF dosyası üretmez. Gömülü veya otomasyonlu önizleme yazdırma penceresini göstermeyebilir; analiz sayfası normal tarayıcı sekmesinde açılarak PDF olarak kaydedilebilir.
 
-Bu düzenlemede sözdizimi ve derleme denetimleri başarılı; tarayıcıda dört kartın döngüsü, analize geçiş ve Belediyeniz ayarları doğrulandı.
+Doğrulama: 32 test başarılı. Tarayıcıda canlı hesap, geçersiz girdi, açılan grafik/tablo, açık/koyu tema, karşılaştırma, belge aktarımı ve 340 / 390 / 454 CSS piksel genişliklerinde taşma kontrolü yapıldı; konsolda hata ve başarısız istek yok.
 
-Doğrulama: 32 test başarılı; alan seçimi, analize geçiş, açık/koyu tema ve 340 / 454 CSS piksel genişliklerinde taşma kontrolü yapıldı.
+#### v4 görünümleri
+
+| Genel bakış | Yatırım alanları |
+|---|---|
+| ![v4 genel bakış](docs/ekran-goruntuleri/v4-genel-bakis.jpg) | ![v4 yatırım alanları](docs/ekran-goruntuleri/v4-yatirim-alanlari.jpg) |
+| ![v4 analiz](docs/ekran-goruntuleri/v4-aydinlatma.jpg) | ![v4 belgeler](docs/ekran-goruntuleri/v4-belgeler.jpg) |
+
+| Mobil: genel bakış | Mobil: analiz |
+|---|---|
+| <img src="docs/ekran-goruntuleri/v4-mobil-genel-bakis.jpg" width="260" alt="v4 mobil genel bakış"> | <img src="docs/ekran-goruntuleri/v4-mobil-aydinlatma.jpg" width="260" alt="v4 mobil analiz"> |
 
 ### v3 – Sakin tasarımın kullanıcıya dönük özellikleri
 
@@ -78,7 +86,7 @@ Dosya biçimleri: `.xlsx`, `.ods` (LibreOffice/Pardus), web sistemlerinin “Exc
 |---|---|
 | ![v3 belge yükleme](docs/ekran-goruntuleri/v3-belge-yukleme.png) | ![v3 kontrol](docs/ekran-goruntuleri/v3-belge-kontrol.png) |
 
-### Yan yana
+### v1 – v3 yan yana
 
 | v1 – Klasik | v2 – Kontrol Merkezi | v3 – Sakin |
 |---|---|---|
@@ -117,11 +125,16 @@ Formüller, varsayımların dayanakları, kaynakça ve sınırlamalar uygulamada
 
 ## Teknik yapı
 
-Sunucu tarafı kod, veritabanı veya derleme adımı yoktur; saf HTML/CSS/JavaScript (ES modülleri) ile yazılmış statik bir sitedir. Bu yüzden herhangi bir web barındırma hizmetinde çalışır. v2 (Inter, Space Grotesk) ve v3 (Figtree, Fraunces) tasarımları yazı tipleri için Google Fonts kullanır; internet bağlantısı yoksa sistem yazı tipine düşer.
+Sunucu tarafı kod, veritabanı veya derleme adımı yoktur; saf HTML/CSS/JavaScript (ES modülleri) ile yazılmış statik bir sitedir. Bu yüzden herhangi bir web barındırma hizmetinde çalışır. v2 (Inter, Space Grotesk) ile v3 ve v4 (Figtree, Fraunces) tasarımları yazı tipleri için Google Fonts kullanır; internet bağlantısı yoksa sistem yazı tipine düşer.
 
 ```
 index.html             Sayfa iskeleti ve Yöntem/Kaynaklar metni
 assets/css/style.css   Stil (açık/koyu tema, mobil, yazdırma)
+assets/css/design.css  v4: kenar menü, çalışma alanı ve mobil düzen
+assets/css/overview.css v4: görselli genel bakış sayfası
+assets/images/         v4: kent panoraması ve altyapı görselleri (WebP)
+assets/js/overview.js  v4: genel bakış sayfası ve açılış kartı
+scripts/build.mjs      v4: yayın klasörünü (dist/) hazırlar
 assets/js/models.js    Dört yatırımın girdileri ve hesap denklemleri
 assets/js/engine.js    NBD, İVO, geri ödeme, Monte Carlo, duyarlılık, başabaş
 assets/js/sources.js   Kaynakça
@@ -142,6 +155,7 @@ Yeni bir yatırım türü eklemek için `models.js` içindeki `MODELS` dizisine 
 ```bash
 npm start      # http://localhost:8080 (Python ile basit sunucu)
 npm test       # hesap motoru testleri (Node.js 18+)
+npm run build  # yalnız uygulama dosyalarını dist/ klasörüne kopyalar (v4)
 ```
 
 `index.html` dosyası doğrudan çift tıklanarak açılamaz (tarayıcılar `file://` üzerinden ES modüllerini engeller); bir web sunucusu üzerinden açılmalıdır.
