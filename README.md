@@ -4,13 +4,41 @@ Belediye personeli ve yöneticileri için web tabanlı ön fizibilite hesaplayı
 
 ## Tasarımlar
 
-Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kullanan üç arayüz tasarımı ayrı dallarda tutulur. Hesap sonuçları üç tasarımda birebir aynıdır; yalnızca sunum ve kullanım akışı farklıdır.
+Aynı hesap motorunu (`engine.js`, `models.js`, `sources.js`, `format.js`) kullanan dört arayüz tasarımı ayrı dallarda tutulur. Hesap sonuçları dört tasarımda birebir aynıdır; yalnızca sunum ve kullanım akışı farklıdır.
 
 | Dal | Tasarım |
 |---|---|
 | [`ccr-32c2df3d-ftrlux`](../../tree/ccr-32c2df3d-ftrlux) | **v1 – Klasik:** sade, rapor odaklı, üst sekmeli; açık/koyu tema |
 | [`tasarim-v2`](../../tree/tasarim-v2) | **v2 – Kontrol Merkezi:** koyu gösterge paneli, kenar menüde canlı durum ışıkları, olasılık halkası, sekmeli analiz |
-| [`tasarim-v3`](../../tree/tasarim-v3) | **v3 – Sakin (bu dal):** sıcak açık zemin, yumuşak yeşil vurgu; yöneticinin sorduğu sorulara göre düzenlenmiş sonuçlar, rehberli veri girişi |
+| [`tasarim-v4-sade`](../../tree/tasarim-v4-sade) | **v4 – Açık (bu dal):** yeşil kenar menü, sade çalışma alanı, yatırım kartları ve ayrıntılara aşamalı erişim |
+| [`tasarim-v3`](../../tree/tasarim-v3) | **v3 – Sakin:** sıcak açık zemin, yumuşak yeşil vurgu; yöneticinin sorduğu sorulara göre düzenlenmiş sonuçlar, rehberli veri girişi |
+
+### v4 – Açık (bu dal)
+
+`tasarim-v4-sade`, belge aktarımını da içeren `tasarim-v3` dalından ayrılmıştır. Açık gri çalışma alanı, koyu yeşil kenar menü ve okunabilir bir bilgi sıralaması kullanır. Hesap motoru, modeller, kaynaklar, sayı biçimlendirme ve belge işleme kodları v3 ile aynıdır.
+
+- **Genel bakış:** dört yatırım alanı, örnek senaryo sonuçları ve üç adımlı kullanım rehberi.
+- **Analiz:** ayrı veri girişi alanı, kısa karar özeti ve geri ödeme / bütçe / belirsizlik / duyarlılık / çevre bölümlerine hızlı erişim.
+- **Ayrıntılar:** grafikler, nakit akışları ve kalem dökümleri kullanıcı istediğinde açılır; raporda tüm ayrıntılar yer alır.
+- **Veri girişi:** mevcut durum önce açılır; maliyet ve etki varsayımları ayrı açılabilir bölümlerdedir. Belge aktarımı, veri kaynağı ve örnek değer etiketleri korunur.
+- **Dar ekran:** kaydırılabilir gezinme, tek sütunlu form ve sonuçlara doğrudan geçiş. Açık/koyu tema ve azaltılmış hareket tercihi desteklenir.
+- **Yayın:** `npm run build` yalnızca uygulama dosyalarını `dist/` klasörüne kopyalar. Sunucu veya paket bağımlılığı eklenmemiştir.
+
+Doğrulama: mevcut 32 test başarılı. Tarayıcıda canlı hesap, geçersiz girdi, açılan grafik/tablo, açık/koyu tema, karşılaştırma ve dar ekran kontrolü yapıldı. Görünüm örnekleri `docs/ekran-goruntuleri/v4-*.jpg` dosyalarındadır.
+
+#### Görsel genel bakış
+
+Açılış sahnesi yalnız genel bakışta sol menünün yanındaki alanı uçtan uca ve ekran yüksekliğinde doldurur. Araç çubuğu görsel üzerinde şeffaftır. İlk ekranda alt içerik görünmez; kaydırınca önce “Değişim nereden başlasın?” bölümü, ardından özet göstergeler gelir. Tekrarlayan alan düğmeleri kaldırılmıştır.
+
+Genel bakış, ayrı `overview.js` ve `overview.css` dosyalarında düzenlenir; hesaplama sayfaları aynı kalır. Kent panoraması ve dört altyapı görseli bu proje için üretilmiş konsept görsellerdir. WebP dosyaları yerelden sunulur; ikisinin toplam boyutu yaklaşık 1 MB’dır.
+
+Görseldeki nokta düğmeleri yerine “Şehirdeki bir fırsat” kartı dört alanı 3,5 saniyede bir sırayla gösterir; başlık ve analiz bağlantısı birlikte değişir. Geçiş göstergesi yoktur. Klavyeyle bağlantıya odaklanıldığında hedef sabit kalır. Kent görseli yavaşça hareket eder; duraklatma düğmesi yoktur, işletim sisteminin azaltılmış hareket tercihi desteklenir. Kartlardaki fiziksel kazanımlar ve özet göstergeler mevcut hesap sonuçlarından alınır. Sayfadan ayrılınca zamanlayıcı, olay dinleyicileri ve gözlemciler temizlenir.
+
+Marka alt başlığı “Harcama Rehberi”dir. Üstteki yinelenen ayarlar düğmesi kaldırılmıştır; genel ayarlar sol menüdeki “Belediyeniz” üzerinden açılır. “Rapor al” mevcut sayfayı `window.print()` ile tarayıcının yazdırma penceresine gönderir; doğrudan PDF dosyası üretmez. Gömülü veya otomasyonlu önizleme yazdırma penceresini göstermeyebilir; analiz sayfası normal tarayıcı sekmesinde açılarak PDF olarak kaydedilebilir.
+
+Bu düzenlemede sözdizimi ve derleme denetimleri başarılı; tarayıcıda dört kartın döngüsü, analize geçiş ve Belediyeniz ayarları doğrulandı.
+
+Doğrulama: 32 test başarılı; alan seçimi, analize geçiş, açık/koyu tema ve 340 / 454 CSS piksel genişliklerinde taşma kontrolü yapıldı.
 
 ### v3 – Sakin tasarımın kullanıcıya dönük özellikleri
 

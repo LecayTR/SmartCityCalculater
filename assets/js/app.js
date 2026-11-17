@@ -1,4 +1,4 @@
-// Arayüz (v3 – Sakin): başlangıç sayfası, rehberli veri girişi, soru-cevap düzeninde sonuçlar,
+// Arayüz (v4 – Açık): başlangıç sayfası, rehberli veri girişi, soru-cevap düzeninde sonuçlar,
 // sade dilli karşılaştırma ve kayıt/yükleme. Hesaplar engine.js ve models.js'tedir.
 
 import { MODELS, GLOBAL_INPUTS, defaultValues } from './models.js';
@@ -10,9 +10,10 @@ import { readFile, ReadError } from './sheets.js';
 import { EXTRACTORS, MANUAL, TARGETS, OPERATIONS, detectType, extractorById, check, inputOf, guessHeader, columnsOf, applyOperation } from './importer.js';
 import { buildTemplate } from './template.js';
 import * as F from './format.js';
+import { renderOverview, mountOverview } from './overview.js';
 
 const STORAGE_KEY = 'akilli-sehir-analizi-v1';
-const THEME_KEY = 'akilli-sehir-tema-v3';
+const THEME_KEY = 'akilli-sehir-tema-v4';
 const KIND_LABEL = { cash: 'Belediye bütçesi', transfer: 'Belediye bütçesi (transfer)', social: 'Toplum' };
 const WHO = { fin: 'belediye bütçesi', eco: 'şehir geneli' };
 
@@ -232,20 +233,21 @@ function driverNotes(model, basis, tor) {
 
 let currentPage = null;
 let answerObserver = null;
+let cleanupOverview = null;
 
 function renderNav() {
-  const link = (id, label, path, extra = '') => `<a class="nav-link" href="#${id}" ${id === currentPage ? 'aria-current="page"' : ''}>${path ? svg(path) : ''}${label}${extra}</a>`;
+  const link = (id, label, path, extra = '') => `<a class="nav-link" href="#${id}" ${id === currentPage ? 'aria-current="page"' : ''}>${path ? svg(path) : ''}<span>${label}</span>${extra}</a>`;
   const models = MODELS.map(m => {
     const { res, mc } = analyse(m);
     const vd = verdict(m, res, mc);
-    return link(m.id, NAV_SHORT[m.id], m.icon, ` <span class="dot" style="background:${STATUS_COLOR[vd.level]}" title="${esc(vd.label)}"></span>`);
+    return link(m.id, m.short, m.icon, `<span class="dot" style="background:${STATUS_COLOR[vd.level]}" title="${esc(vd.label)}"></span>`);
   }).join('');
-  $('#main-nav').innerHTML = link('baslangic', 'Başlangıç', P.home) + '<span class="nav-sep" aria-hidden="true"></span>' + models +
-    '<span class="nav-sep" aria-hidden="true"></span>' + link('belgeler', 'Belge yükle', P.upload) + link('karsilastirma', 'Karşılaştır', P.compare) + link('yontem', 'Yöntem', P.method);
-  $('[data-bind="municipality"]').textContent = state.municipality || 'Yatırım Rehberi';
-  // Dar ekranda etkin sekme görünür alana kaydırılır.
-  const nav = $('#main-nav'), active = nav.querySelector('[aria-current="page"]');
-  if (active && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.clientWidth) / 2;
+  $('#main-nav').innerHTML = link('baslangic', 'Genel bakış', P.home) +
+    '<span class="nav-section">YATIRIM ANALİZLERİ</span>' + models +
+    '<span class="nav-section">ARAÇLAR</span>' + link('karsilastirma', 'Yatırımları karşılaştır', P.compare) + link('belgeler', 'Belgelerden veri al', P.upload) + link('yontem', 'Yöntem ve kaynaklar', P.method);
+  $('[data-bind="municipality"]').textContent = state.municipality || 'Belediyeniz';
+  $('#page-label').textContent = modelById(currentPage)?.name || ({ baslangic: 'Genel bakış', belgeler: 'Belgelerden veri al', karsilastirma: 'Yatırımları karşılaştır', yontem: 'Yöntem ve kaynaklar' })[currentPage];
+  document.body.dataset.page = currentPage;
 }
 
 function route() {
@@ -255,6 +257,8 @@ function route() {
   const changed = target !== currentPage;
   currentPage = target;
   answerObserver?.disconnect();
+  cleanupOverview?.();
+  cleanupOverview = null;
   $('#answer-dock').hidden = true;
   if (modelById(target)) renderModelPage(modelById(target));
   else if (target === 'karsilastirma') renderCompare();
@@ -262,53 +266,23 @@ function route() {
   else if (target === 'yontem') renderMethod(anchor);
   else renderStart();
   renderNav();
-  if (changed && !anchor) window.scrollTo(0, 0);
+  if (modelById(target) && anchor) document.getElementById(anchor)?.scrollIntoView({ block: 'start' });
+  else if (changed && !anchor) window.scrollTo(0, 0);
 }
 
 function printMeta() {
   const date = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
   const parts = [state.municipality || 'Belediye adı girilmedi', state.preparer, date].filter(Boolean);
-  return `<div class="print-only card pad" style="margin-bottom:14px"><strong>Akıllı Şehir Yatırım Rehberi – Ön Fizibilite Raporu</strong><br>${parts.map(esc).join(' · ')}</div>`;
+  return `<div class="print-only card pad" style="margin-bottom:14px"><strong>Akıllı Şehir Harcama Rehberi – Ön Fizibilite Raporu</strong><br>${parts.map(esc).join(' · ')}</div>`;
 }
 
 // ---------- Başlangıç ----------
 
 function renderStart() {
-  const cards = MODELS.map(m => {
-    const { res, mc } = analyse(m);
-    const vd = verdict(m, res, mc);
-    const c = completeness(m);
-    return `<a class="choice card" href="#${m.id}">
-      <div class="choice-head"><span class="choice-icon">${svg(m.icon)}</span><h3>${m.name}</h3></div>
-      <p>${m.summary}</p>
-      <div>${statusChip(vd)}</div>
-      <div class="choice-answer">${shortAnswer(m, res)}</div>
-      <div class="choice-foot"><span>Belediye verisi: <b>${c.done} / ${c.total}</b> alan</span><span class="go">${c.done ? 'Devam et' : 'Hesapla'} →</span></div>
-    </a>`;
-  }).join('');
-
-  $('#view').innerHTML = `
-    <section class="welcome card">
-      <div>
-        <p class="kicker">Belediyeler için ön fizibilite aracı</p>
-        <h1>Akıllı şehir yatırımınız kendini öder mi?</h1>
-        <p class="lead">Belediyenizin verilerini girin; araç yatırımın ne zaman kendini ödeyeceğini, bütçeye ve şehre ne kazandıracağını ve bu sonuçtan ne kadar emin olabileceğinizi sade bir dille göstersin.</p>
-      </div>
-      <ol class="how">
-        <li><div><b>Yatırımı seçin</b><span>Aşağıdaki dört akıllı şehir yatırımından birini açın.</span></div></li>
-        <li><div><b>Verilerinizi girin ya da belge yükleyin</b><span>“Örnek” etiketli alanları elle değiştirin veya e-Fatura, su kayıpları raporu, envanter gibi belgelerinizi yükleyin.</span></div></li>
-        <li><div><b>Cevabı okuyun, rapor alın</b><span>Sonuç, yöneticilerin sorduğu sorulara göre özetlenir. “Rapor al” ile PDF olarak saklayabilirsiniz.</span></div></li>
-      </ol>
-    </section>
-    <h2 class="section-title">Yatırımlar</h2>
-    <p class="section-sub">Kartlardaki sonuçlar şu an girili değerlere göredir; örnek değerlerle başlar.</p>
-    <div class="choice-grid">${cards}</div>
-    <div class="quick">
-      <a class="card" href="#belgeler">${svg(P.upload)}<div><b>Belgeden doldurun</b><span>Excel, CSV veya e-Fatura dosyalarınızdaki değerleri alanlara aktarın.</span></div></a>
-      <a class="card" href="#karsilastirma">${svg(P.compare)}<div><b>Yatırımları karşılaştırın</b><span>Bütçe kısıtlıysa hangi yatırımın önce yapılacağını görün.</span></div></a>
-      <a class="card" href="#" data-action="settings">${svg(P.settings)}<div><b>Genel ayarlar</b><span>Belediye adı, iskonto oranı, fiyat artışı ve karbon değeri.</span></div></a>
-      <a class="card" href="#yontem">${svg(P.method)}<div><b>Yöntem ve kaynaklar</b><span>Hesaplamaların nasıl yapıldığı ve dayandığı kaynaklar.</span></div></a>
-    </div>`;
+  cleanupOverview?.();
+  const results = MODELS.map(model => ({ model, ...analyse(model), completion: completeness(model) }));
+  $('#view').innerHTML = renderOverview(results);
+  cleanupOverview = mountOverview($('#view'));
 }
 
 // ---------- Form ----------
@@ -415,7 +389,7 @@ function renderModelPage(model) {
   const v = state.values[model.id];
   const groups = GROUPS.map((gr, k) => {
     const fields = model.inputs.filter(i => i.group === gr.id).map(i => fieldHtml(i, v[i.key], model.id, model)).join('');
-    return `<details class="group card" ${k < 2 || window.innerWidth > 1080 ? 'open' : ''}>
+    return `<details class="group card" ${k === 0 ? 'open' : ''}>
       <summary><span class="group-no">${k + 1}</span><span class="group-title"><b>${gr.title}</b><small>${gr.hint}</small></span><span class="chev" aria-hidden="true">›</span></summary>
       <div class="group-body"><p class="sub">${gr.sub}</p>${fields}</div>
     </details>`;
@@ -427,6 +401,8 @@ function renderModelPage(model) {
       <a class="back no-print" href="#baslangic">← Tüm yatırımlar</a>
       <div class="title-row"><span class="title-icon">${svg(model.icon)}</span><div><h1>${model.name}</h1><p>${model.summary}</p></div></div>
     </div>
+    <div class="mobile-analysis-actions no-print"><a class="btn" href="#${model.id}/model-form" data-jump="model-form">Verileri düzenle</a><a class="btn primary" href="#${model.id}/answer" data-jump="answer">Sonuçlara geç ↓</a></div>
+    <div class="analysis-guide no-print"><span><b>01</b> Verilerinizi düzenleyin</span><span><b>02</b> Sonucu okuyun</span><span><b>03</b> Ayrıntıları açarak inceleyin</span><a href="#" data-action="print">Rapor alın <svg class="arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></a></div>
     <div class="layout">
       <form class="data-col" id="model-form" autocomplete="off" onsubmit="return false" aria-label="Veri girişi">
         <section class="data-head card">
@@ -434,11 +410,11 @@ function renderModelPage(model) {
           <div class="meter"><div class="meter-bar"><i id="meter-fill"></i></div><div class="meter-text"><span>Belediye verisi</span><span id="meter-label"></span></div></div>
           <p class="hint">“Örnek” etiketli alanlar henüz varsayılan değerde. Kendi kaydınızla değiştirin ya da değer doğruysa “Doğru”ya basın.</p>
         </section>
-        <section class="card import-hint no-print">
+        <details class="card import-hint no-print"><summary>Belgeniz varsa verileri aktarın <span aria-hidden="true">＋</span></summary>
           <div class="import-hint-head">${svg(P.upload)}<div><b>Elle girmek zorunda değilsiniz</b><span>Belgelerinizi yükleyin; ilgili alanlar kontrolünüzden sonra dolsun.</span></div></div>
           <ul>${(DOCS_FOR[model.id] || []).map(id => `<li>${esc((extractorById(id) || MANUAL).title)}</li>`).join('')}</ul>
           <a class="btn" href="#belgeler">${svg(P.upload)}Belge yükle</a>
-        </section>
+        </details>
         ${groups}
         <div class="reset-row no-print"><button type="button" class="btn quiet" id="btn-reset-model">Bu yatırımın verilerini sıfırla</button></div>
       </form>
@@ -475,6 +451,7 @@ function renderModelPage(model) {
 
   updateMeter(model);
   renderResults(model);
+  document.querySelectorAll('[data-jump]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); document.getElementById(a.dataset.jump)?.scrollIntoView({ behavior: smooth(), block: 'start' }); }));
 }
 
 function updateMeter(model) {
@@ -499,12 +476,12 @@ function renderResults(model) {
     ? [
       ['Geri ödeme süresi', res.fin.payback != null ? F.years(res.fin.payback) : 'Ömür içinde yok', `Ekonomik ömür ${res.life} yıl`],
       ['Net kazanç (bugünkü değerle)', F.tlShort(res.fin.npv), 'Belediye bütçesi için'],
-      ['Güven', `10 senaryodan ${k}`, 'Kendini ödediği senaryo sayısı'],
+      ['Olumlu sonuç olasılığı', F.pct(mc[p].pPositive * 100, 0), `10 senaryodan yaklaşık ${k} olumlu`],
     ]
     : [
       ['Şehre net değer', F.tlShort(res.eco.npv), 'Bugünkü değerle, ömür boyunca'],
       ['Her 1 TL’ye fayda', res.eco.bcr != null ? `${F.num(res.eco.bcr, 2)} TL` : '—', 'Fayda / maliyet oranı'],
-      ['Güven', `10 senaryodan ${k}`, 'Olumlu sonuç veren senaryo sayısı'],
+      ['Olumlu sonuç olasılığı', F.pct(mc[p].pPositive * 100, 0), `10 senaryodan yaklaşık ${k} olumlu`],
     ];
   const factHtml = facts.map(([l, v, s]) => `<div class="fact"><small>${l}</small><b class="${String(v).startsWith('-') ? 'neg-text' : ''}">${v}</b><span>${s}</span></div>`).join('');
   const caution = c.done / c.total < 0.5
@@ -522,7 +499,10 @@ function renderResults(model) {
       <div class="facts">${factHtml}</div>
       ${caution}
     </section>
+    <nav class="result-nav no-print" aria-label="Sonuç bölümleri"><a href="#${model.id}/q1" data-result="q1">Geri ödeme</a><a href="#${model.id}/q2" data-result="q2">Bütçe</a><a href="#${model.id}/q3" data-result="q3">Belirsizlik</a><a href="#${model.id}/q4" data-result="q4">Duyarlılık</a><a href="#${model.id}/q5" data-result="q5">Şehir ve çevre</a></nav>
     ${order.map(id => cards[id]).join('')}`;
+
+  box.querySelectorAll('[data-result]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); document.getElementById(a.dataset.result)?.scrollIntoView({ behavior: smooth(), block: 'start' }); }));
 
   // Ayrıntı bölümleri: açık olanlar korunur, açıldıklarında grafikleri çizilir.
   box.querySelectorAll('details[data-id]').forEach(d => {

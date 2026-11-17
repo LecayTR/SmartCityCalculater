@@ -3,37 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Akıllı Şehir Yatırım Rehberi</title>
+  <title>Akıllı Şehir Harcama Rehberi</title>
   <meta name="description" content="Belediyeler için akıllı aydınlatma, akıllı su yönetimi, akıllı atık toplama ve akıllı trafik yatırımlarının geri ödeme süresi, net bugünkü değer ve toplumsal fayda hesaplayıcısı.">
-  <meta name="theme-color" content="#f4f2ec">
+  <meta name="theme-color" content="#173c34">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='10' fill='%232e6b5e'/%3E%3Cpath d='M8 23V15h3.5v8zm6.25 0V9h3.5v14zM20.5 23v-5H24v5z' fill='%23fffefa'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
   <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/design.css">
+  <link rel="stylesheet" href="assets/css/overview.css">
   <script>
     // Kaydedilmiş tema sayfa çizilmeden uygulanır; yoksa işletim sistemi tercihi geçerlidir.
-    try { const t = localStorage.getItem('akilli-sehir-tema-v3'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+    try { const t = localStorage.getItem('akilli-sehir-tema-v4'); document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }
   </script>
   <script type="module" src="assets/js/app.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#view">İçeriğe geç</a>
+  <aside class="sidebar no-print" aria-label="Çalışma alanı">
+    <a class="side-brand" href="#baslangic" aria-label="Akıllı Şehir başlangıç">
+      <span class="side-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M5 26V14h5v12m3 0V6h6v20m3 0V17h5v9M3 27h26"/></svg></span>
+      <span>Akıllı Şehir<small>HARCAMA REHBERİ</small></span>
+    </a>
+    <button type="button" class="workspace" data-action="settings"><span class="workspace-icon" aria-hidden="true">B</span><span><small>Çalışma alanı</small><b data-bind="municipality">Belediyeniz</b></span><span aria-hidden="true">⌄</span></button>
+    <nav class="main-nav" id="main-nav" aria-label="Ana gezinme"></nav>
+    <div class="side-bottom"><div class="privacy-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6zM8 12l3 3 5-6"/></svg><span>Verileriniz sizde kalır.<small>Hesaplamalar bu tarayıcıda yapılır.</small></span></div><div class="side-edition"><span>Ön fizibilite çalışma alanı</span><span>v4</span></div></div>
+  </aside>
   <header class="site-head">
     <div class="head-row">
-      <a class="brand" href="#baslangic">
+      <a class="brand mobile-brand" href="#baslangic">
         <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 23V15h3.5v8zm6.25 0V9h3.5v14zM20.5 23v-5H24v5z"/></svg></span>
-        <span class="brand-text"><strong>Akıllı Şehir</strong><small data-bind="municipality">Yatırım Rehberi</small></span>
+        <span class="brand-text"><strong>Akıllı Şehir</strong><small>Harcama Rehberi</small></span>
       </a>
+      <div class="breadcrumb"><span>Çalışma alanı</span><span aria-hidden="true">/</span><strong id="page-label">Genel bakış</strong></div>
       <div class="head-actions">
-        <button class="tool" type="button" data-action="settings" title="Genel ayarlar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.7a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z"/></svg><span class="lbl">Ayarlar</span></button>
         <button class="tool" type="button" data-action="save" title="Tüm girdileri dosyaya kaydet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6V3zM4 19h16v2H4z"/></svg><span class="lbl">Kaydet</span></button>
         <label class="tool" title="Kaydedilmiş dosyayı yükle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9.8l3.6 3.6L17 12l-6-6-6 6 1.4 1.4L11 9.8V21zM4 3h16v2H4z"/></svg><span class="lbl">Yükle</span><input type="file" class="sr-only" data-action="load" accept="application/json,.json"></label>
         <button class="tool" type="button" data-action="theme" aria-label="Açık / koyu tema"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
         <button class="btn primary" type="button" data-action="print"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12v5H6zM4 8h16a2 2 0 0 1 2 2v7h-4v5H6v-5H2v-7a2 2 0 0 1 2-2zm4 9v3h8v-3z"/></svg><span class="lbl">Rapor al</span></button>
       </div>
     </div>
-    <nav class="main-nav" id="main-nav" aria-label="Bölümler"></nav>
   </header>
 
   <main id="view" tabindex="-1">
@@ -41,6 +51,7 @@
   </main>
 
   <footer class="site-foot">
+    <div class="foot-brand"><strong>Akıllı Şehir</strong><span>Daha bilinçli yatırım kararları için.</span><a href="#yontem">Yöntem ve kaynaklar <svg class="arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></a></div>
     <p>Bu araç bir ön fizibilite aracıdır; sonuçlar girilen veri ve varsayımlar kadar güvenilirdir. Yatırım kararından önce pilot uygulama ölçümleri ve ayrıntılı fizibilite etüdü ile doğrulanmalıdır. Girdiler yalnızca bu tarayıcıda saklanır, hiçbir sunucuya gönderilmez.</p>
   </footer>
 
